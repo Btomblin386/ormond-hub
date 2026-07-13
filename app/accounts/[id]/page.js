@@ -2,8 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Shell from "../../../components/Shell";
 import TrendChart from "../../../components/TrendChart";
-import { accountById, accountTotals, accountTrend, accountCampaigns, clientsWithGa4, insightsForClient, insightsGeneratedAt } from "../../../lib/db";
+import SeasonalityChart from "../../../components/SeasonalityChart";
+import { accountById, accountTotals, accountTrend, accountCampaigns, clientsWithGa4, insightsForClient, insightsGeneratedAt, storeMonthly } from "../../../lib/db";
 import { money, num, roas, roasClass } from "../../../lib/format";
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export const dynamic = "force-dynamic";
 
@@ -12,17 +15,28 @@ export default async function AccountDetail({ params, searchParams }) {
   const acct = await accountById(params.id);
   if (!acct) notFound();
 
-  const [totals, trend, campaigns, ga4Clients, insights, insightsAt] = await Promise.all([
+  const [totals, trend, campaigns, ga4Clients, insights, insightsAt, store] = await Promise.all([
     accountTotals(params.id, days),
     accountTrend(params.id, days),
     accountCampaigns(params.id, days),
     clientsWithGa4(),
     insightsForClient(acct.client),
     insightsGeneratedAt(acct.client),
+    storeMonthly(acct.client),
   ]);
 
   const r = roas(totals.revenue, totals.spend);
   const ctr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
+
+  // Build year-over-year seasonality overlay (last up to 3 years, complete months only)
+  const seasonYears = [...new Set(store.map((s) => String(s.year)))].sort().slice(-3);
+  const seasonal = MONTHS.map((m, i) => {
+    const row = { month: m };
+    for (const s of store) {
+      if (s.mon === i + 1 && seasonYears.includes(String(s.year))) row[String(s.year)] = Math.round(s.revenue);
+    }
+    return row;
+  });
   const hasGa4 = ga4Clients.includes(acct.client);
 
   return (
@@ -70,6 +84,14 @@ export default async function AccountDetail({ params, searchParams }) {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {store.length > 0 && (
+        <div className="panel">
+          <h2>Business seasonality — total store revenue by month (year over year)</h2>
+          <p className="note">The whole business&apos;s seasonal shape. Use it to judge whether a product&apos;s move is real or just the season.</p>
+          <SeasonalityChart data={seasonal} years={seasonYears} />
         </div>
       )}
 
