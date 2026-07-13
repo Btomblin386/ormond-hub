@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Shell from "../../../components/Shell";
 import TrendChart from "../../../components/TrendChart";
-import { accountById, accountTotals, accountTrend, accountCampaigns, clientsWithGa4 } from "../../../lib/db";
+import { accountById, accountTotals, accountTrend, accountCampaigns, clientsWithGa4, insightsForClient, insightsGeneratedAt } from "../../../lib/db";
 import { money, num, roas, roasClass } from "../../../lib/format";
 
 export const dynamic = "force-dynamic";
@@ -12,11 +12,13 @@ export default async function AccountDetail({ params, searchParams }) {
   const acct = await accountById(params.id);
   if (!acct) notFound();
 
-  const [totals, trend, campaigns, ga4Clients] = await Promise.all([
+  const [totals, trend, campaigns, ga4Clients, insights, insightsAt] = await Promise.all([
     accountTotals(params.id, days),
     accountTrend(params.id, days),
     accountCampaigns(params.id, days),
     clientsWithGa4(),
+    insightsForClient(acct.client),
+    insightsGeneratedAt(acct.client),
   ]);
 
   const r = roas(totals.revenue, totals.spend);
@@ -43,6 +45,33 @@ export default async function AccountDetail({ params, searchParams }) {
         <div className="card"><div className="label">ROAS</div><div className={"value " + roasClass(r)}>{r.toFixed(1)}x</div></div>
         <div className="card"><div className="label">Conversions</div><div className="value">{num(Math.round(totals.conversions))}</div><div className="foot">CTR {ctr.toFixed(1)}%</div></div>
       </div>
+
+      {insights.length > 0 && (
+        <div className="panel">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+            <h2>Smart Insights</h2>
+            {insightsAt && (
+              <span className="note" style={{ margin: 0 }}>
+                Updated {new Date(insightsAt).toLocaleDateString()}
+              </span>
+            )}
+          </div>
+          <p className="note">AI-flagged opportunities and issues from monthly sales trends (month-over-month + year-over-year).</p>
+          <div className="insights-grid">
+            {insights.map((n, i) => (
+              <div key={i} className={"insight " + n.category}>
+                <div className="ihead">
+                  <span className={"badge " + n.category}>{n.category}</span>
+                  <span className="sev">{n.severity}</span>
+                </div>
+                <div className="ititle">{n.title}</div>
+                {n.scope && n.scope !== "account" && <div className="iscope">{n.scope}</div>}
+                <div className="idetail">{n.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="panel">
         <h2>Daily spend vs. revenue</h2>
