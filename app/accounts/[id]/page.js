@@ -5,7 +5,9 @@ import TrendChart from "../../../components/TrendChart";
 import SeasonalityChart from "../../../components/SeasonalityChart";
 import InsightCard from "../../../components/InsightCard";
 import PinnedItem from "../../../components/PinnedItem";
-import { accountById, accountTotals, accountTrend, accountCampaigns, clientsWithGa4, insightsForClient, insightsGeneratedAt, storeMonthly, pinnedForClient } from "../../../lib/db";
+import AccountChat from "../../../components/AccountChat";
+import CampaignStudio from "../../../components/CampaignStudio";
+import { accountById, accountTotals, accountTrend, accountCampaigns, clientsWithGa4, insightsForClient, insightsGeneratedAt, storeMonthly, pinnedForClient, campaignPlanForClient } from "../../../lib/db";
 import { money, num, roas, roasClass } from "../../../lib/format";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -23,7 +25,7 @@ export default async function AccountDetail({ params, searchParams }) {
   const acct = await accountById(params.id);
   if (!acct) notFound();
 
-  const [totals, trend, campaigns, ga4Clients, insights, insightsAt, store, pinned] = await Promise.all([
+  const [totals, trend, campaigns, ga4Clients, insights, insightsAt, store, pinned, campaignPlan] = await Promise.all([
     accountTotals(params.id, days),
     accountTrend(params.id, days),
     accountCampaigns(params.id, days),
@@ -32,6 +34,7 @@ export default async function AccountDetail({ params, searchParams }) {
     insightsGeneratedAt(acct.client),
     storeMonthly(acct.client),
     pinnedForClient(acct.client),
+    campaignPlanForClient(acct.client),
   ]);
 
   const pinnedTitles = new Set(pinned.map((p) => p.title));
@@ -108,6 +111,10 @@ export default async function AccountDetail({ params, searchParams }) {
           })}
         </div>
       )}
+
+      <CampaignStudio client={acct.client} initialPlan={campaignPlan} />
+
+      <AccountChat client={acct.client} />
 
       {store.length > 0 && (
         <div className="panel">

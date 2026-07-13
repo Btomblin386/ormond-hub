@@ -13,10 +13,11 @@ One task at a time.
 - **Next.js security bump** — 14.2.5 has an advisory; move to a patched 14.2.x.
 - **DST** — cron times set in UTC for CDT; shift 1 hr when Central goes to Standard time (Nov).
 
-## Next up (account AI)
-- **Account chat** — ask questions inside an account ("What would improve performance?", "Add a URL parameter to the FB campaign for better GA source matching"), answered with full account context. Needs ANTHROPIC_API_KEY added to Vercel.
-- **Campaign-draft workflow** — evaluate recent high-performing campaigns vs. trending products, list the content/materials needed, then draft campaigns aimed at the highest-performing audiences. Builds on account chat + Meta ads_management (draft-and-approve, paused by default).
+## Next up
+- **Push drafts to Meta (paused)** — take a Campaign Studio draft and create it in Meta as PAUSED for review/approval, then one-click activate. Uses Meta ads_management (already granted). Needs creative handling (image/video upload or reference).
 
 ## Done
 - **Smart Insights** — AI-flagged opportunities/issues per account (seasonality, sharp drops, trends).
 - **Insights grouping + pinning** — grouped by category; pin to capture a baseline and track impact over 30 days.
+- **Account chat** — free-form Q&A per account with full context (Supabase-hosted, no Vercel key needed).
+- **Campaign Studio** — evaluates top campaigns vs. trending products, lists content/materials, drafts 3 campaigns to best audiences.
