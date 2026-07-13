@@ -3,10 +3,18 @@ import { notFound } from "next/navigation";
 import Shell from "../../../components/Shell";
 import TrendChart from "../../../components/TrendChart";
 import SeasonalityChart from "../../../components/SeasonalityChart";
-import { accountById, accountTotals, accountTrend, accountCampaigns, clientsWithGa4, insightsForClient, insightsGeneratedAt, storeMonthly } from "../../../lib/db";
+import InsightCard from "../../../components/InsightCard";
+import PinnedItem from "../../../components/PinnedItem";
+import { accountById, accountTotals, accountTrend, accountCampaigns, clientsWithGa4, insightsForClient, insightsGeneratedAt, storeMonthly, pinnedForClient } from "../../../lib/db";
 import { money, num, roas, roasClass } from "../../../lib/format";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const GROUPS = [
+  { key: "opportunity", label: "Opportunities" },
+  { key: "issue", label: "Issues" },
+  { key: "trend", label: "Trends" },
+  { key: "info", label: "Other" },
+];
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +23,7 @@ export default async function AccountDetail({ params, searchParams }) {
   const acct = await accountById(params.id);
   if (!acct) notFound();
 
-  const [totals, trend, campaigns, ga4Clients, insights, insightsAt, store] = await Promise.all([
+  const [totals, trend, campaigns, ga4Clients, insights, insightsAt, store, pinned] = await Promise.all([
     accountTotals(params.id, days),
     accountTrend(params.id, days),
     accountCampaigns(params.id, days),
@@ -23,7 +31,10 @@ export default async function AccountDetail({ params, searchParams }) {
     insightsForClient(acct.client),
     insightsGeneratedAt(acct.client),
     storeMonthly(acct.client),
+    pinnedForClient(acct.client),
   ]);
+
+  const pinnedTitles = new Set(pinned.map((p) => p.title));
 
   const r = roas(totals.revenue, totals.spend);
   const ctr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
@@ -60,6 +71,16 @@ export default async function AccountDetail({ params, searchParams }) {
         <div className="card"><div className="label">Conversions</div><div className="value">{num(Math.round(totals.conversions))}</div><div className="foot">CTR {ctr.toFixed(1)}%</div></div>
       </div>
 
+      {pinned.length > 0 && (
+        <div className="panel">
+          <h2>Pinned — tracking impact over time</h2>
+          <p className="note">Baseline captured when you pinned. Compare against the latest month to see if your changes moved it.</p>
+          {pinned.map((p) => (
+            <PinnedItem key={p.id} client={acct.client} item={p} />
+          ))}
+        </div>
+      )}
+
       {insights.length > 0 && (
         <div className="panel">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -70,20 +91,21 @@ export default async function AccountDetail({ params, searchParams }) {
               </span>
             )}
           </div>
-          <p className="note">AI-flagged opportunities and issues from monthly sales trends (month-over-month + year-over-year).</p>
-          <div className="insights-grid">
-            {insights.map((n, i) => (
-              <div key={i} className={"insight " + n.category}>
-                <div className="ihead">
-                  <span className={"badge " + n.category}>{n.category}</span>
-                  <span className="sev">{n.severity}</span>
+          <p className="note">AI-flagged from monthly sales trends (month-over-month + year-over-year), judged against the business seasonality. Pin any card to track it.</p>
+          {GROUPS.map((g) => {
+            const items = insights.filter((n) => n.category === g.key);
+            if (items.length === 0) return null;
+            return (
+              <div key={g.key}>
+                <div className={"insight-group-title " + g.key}>{g.label}</div>
+                <div className="insights-grid">
+                  {items.map((n, i) => (
+                    <InsightCard key={i} client={acct.client} insight={n} pinned={pinnedTitles.has(n.title)} />
+                  ))}
                 </div>
-                <div className="ititle">{n.title}</div>
-                {n.scope && n.scope !== "account" && <div className="iscope">{n.scope}</div>}
-                <div className="idetail">{n.detail}</div>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       )}
 
