@@ -174,12 +174,6 @@ export default function CampaignStudio({ client, initialPlan, accountExt, existi
       {plan && (
         <>
           {plan.summary && <div className="studio-summary">{plan.summary}</div>}
-          {Array.isArray(plan.materials) && plan.materials.length > 0 && (
-            <div className="studio-block">
-              <div className="studio-h">Content &amp; materials needed</div>
-              <ul className="studio-list">{plan.materials.map((m, i) => <li key={i}>{m}</li>)}</ul>
-            </div>
-          )}
           {Array.isArray(plan.campaigns) && plan.campaigns.length > 0 && (
             <div className="studio-block">
               <div className="studio-h">Drafted campaigns</div>

@@ -4,9 +4,10 @@ import { useRouter } from "next/navigation";
 
 const money = (n) => "$" + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
 
-export default function AdsManager({ accountId, accountExt, cap, campaigns, writes }) {
+export default function AdsManager({ accountId, accountExt, cap, urlParams, campaigns, writes }) {
   const router = useRouter();
   const [capInput, setCapInput] = useState(cap == null ? "" : String(cap));
+  const [paramsInput, setParamsInput] = useState(urlParams || "");
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
   const [budgets, setBudgets] = useState({});
@@ -22,6 +23,19 @@ export default function AdsManager({ accountId, accountExt, cap, campaigns, writ
       });
       const d = await r.json();
       flash(d.error ? `Error: ${d.error}` : `Daily cap saved: ${d.cap == null ? "none" : money(d.cap)}.`);
+      router.refresh();
+    } finally { setBusy(""); }
+  }
+
+  async function saveParams() {
+    setBusy("params");
+    try {
+      const r = await fetch("/api/account-settings", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId, urlParams: paramsInput }),
+      });
+      const d = await r.json();
+      flash(d.error ? `Error: ${d.error}` : d.urlParams ? "URL parameters saved." : "URL parameters cleared.");
       router.refresh();
     } finally { setBusy(""); }
   }
@@ -54,6 +68,14 @@ export default function AdsManager({ accountId, accountExt, cap, campaigns, writ
           onChange={(e) => setCapInput(e.target.value)} />
         <button onClick={saveCap} disabled={busy === "cap"}>{busy === "cap" ? "Saving…" : "Save cap"}</button>
         <span className="mng-hint">Budget increases above this are blocked.</span>
+      </div>
+
+      <div className="mng-cap">
+        <label>URL parameters</label>
+        <input type="text" style={{ width: 300 }} value={paramsInput} placeholder="utm_source=facebook&utm_medium=paid"
+          onChange={(e) => setParamsInput(e.target.value)} />
+        <button onClick={saveParams} disabled={busy === "params"}>{busy === "params" ? "Saving…" : "Save params"}</button>
+        <span className="mng-hint">Auto-appended to destination URLs on every new campaign from Studio.</span>
       </div>
 
       <div className="mng-table-wrap">

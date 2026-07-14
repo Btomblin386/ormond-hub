@@ -9,7 +9,8 @@ import AccountChat from "../../../components/AccountChat";
 import CampaignStudio from "../../../components/CampaignStudio";
 import AdsManager from "../../../components/AdsManager";
 import RulesManager from "../../../components/RulesManager";
-import { accountById, accountTotals, accountTrend, accountCampaigns, clientsWithGa4, insightsForClient, insightsGeneratedAt, storeMonthly, pinnedForClient, campaignPlanForClient, accountCampaignsManaged, adWritesForAccount, rulesForAccount, ruleEventsForAccount } from "../../../lib/db";
+import ContentManager from "../../../components/ContentManager";
+import { accountById, accountTotals, accountTrend, accountCampaigns, clientsWithGa4, insightsForClient, insightsGeneratedAt, storeMonthly, pinnedForClient, campaignPlanForClient, accountCampaignsManaged, adWritesForAccount, rulesForAccount, ruleEventsForAccount, contentForClient, socialForClient } from "../../../lib/db";
 import { money, num, roas, roasClass } from "../../../lib/format";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -27,7 +28,7 @@ export default async function AccountDetail({ params, searchParams }) {
   const acct = await accountById(params.id);
   if (!acct) notFound();
 
-  const [totals, trend, campaigns, ga4Clients, insights, insightsAt, store, pinned, campaignPlan, managedCampaigns, adWrites, rules, ruleEvents] = await Promise.all([
+  const [totals, trend, campaigns, ga4Clients, insights, insightsAt, store, pinned, campaignPlan, managedCampaigns, adWrites, rules, ruleEvents, contentItems, social] = await Promise.all([
     accountTotals(params.id, days),
     accountTrend(params.id, days),
     accountCampaigns(params.id, days),
@@ -41,6 +42,8 @@ export default async function AccountDetail({ params, searchParams }) {
     adWritesForAccount(params.id),
     rulesForAccount(params.id),
     ruleEventsForAccount(params.id),
+    contentForClient(acct.client_id),
+    socialForClient(acct.client_id),
   ]);
 
   const pinnedTitles = new Set(pinned.map((p) => p.title));
@@ -164,10 +167,13 @@ export default async function AccountDetail({ params, searchParams }) {
         </table>
       </div>
 
+      <ContentManager clientId={acct.client_id} client={acct.client} items={contentItems} social={social} />
+
       <AdsManager
         accountId={acct.id}
         accountExt={acct.external_account_id}
         cap={acct.max_daily_budget}
+        urlParams={acct.url_params}
         campaigns={managedCampaigns}
         writes={adWrites}
       />

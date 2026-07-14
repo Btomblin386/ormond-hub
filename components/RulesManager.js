@@ -2,13 +2,16 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-const METRIC_LABEL = { roas: "ROAS", cpa: "CPA ($)", spend: "Spend ($)", conversions: "Conversions" };
+const METRIC_LABEL = { roas: "ROAS", cpa: "CPA ($)", spend: "Spend ($)", conversions: "Conversions", frequency: "Frequency (fatigue)", ctr: "CTR % (fatigue)" };
+const AD_LEVEL = new Set(["frequency", "ctr"]);
 
 function describe(r) {
   const cmp = r.comparator === "lt" ? "drops below" : "rises above";
-  const val = r.metric === "roas" ? `${r.threshold}x` : r.metric === "cpa" || r.metric === "spend" ? `$${r.threshold}` : r.threshold;
-  const act = r.action === "pause" ? (r.auto_apply ? "auto-pause it" : "flag it to pause") : "notify me";
-  return `If ${METRIC_LABEL[r.metric]} ${cmp} ${val} over ${r.window_days}d (min $${r.min_spend} spend) → ${act}.`;
+  const val = r.metric === "roas" ? `${r.threshold}x` : r.metric === "cpa" || r.metric === "spend" ? `$${r.threshold}` : r.metric === "ctr" ? `${r.threshold}%` : r.threshold;
+  const scope = AD_LEVEL.has(r.metric) ? "an ad's" : "a campaign's";
+  const target = AD_LEVEL.has(r.metric) ? "the ad" : "it";
+  const act = r.action === "pause" ? (r.auto_apply ? `auto-pause ${target}` : `flag ${target} to pause`) : "notify me";
+  return `If ${scope} ${METRIC_LABEL[r.metric]} ${cmp} ${val} over ${r.window_days}d (min $${r.min_spend} spend) → ${act}.`;
 }
 
 export default function RulesManager({ accountId, rules, events }) {
