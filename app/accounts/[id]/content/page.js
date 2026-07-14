@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Shell from "../../../../components/Shell";
 import AccountTabs from "../../../../components/AccountTabs";
 import ContentBoard from "../../../../components/ContentBoard";
-import { accountById, contentForClient, socialsForClient, tasksForClient, listUsers } from "../../../../lib/db";
+import { accountById, contentForClient, socialsForClient, tasksForClient, listUsers, brandSettings, dropboxAccount } from "../../../../lib/db";
 import { getSession } from "../../../../lib/session";
 
 export const dynamic = "force-dynamic";
@@ -13,11 +13,13 @@ export default async function AccountContent({ params, searchParams }) {
   if (!acct) notFound();
   const role = getSession()?.role || "agency";
 
-  const [items, socials, tasks, users] = await Promise.all([
+  const [items, socials, tasks, users, brand, dbx] = await Promise.all([
     contentForClient(acct.client_id),
     socialsForClient(acct.client_id),
     tasksForClient(acct.client_id),
     listUsers().catch(() => []),
+    brandSettings(acct.client_id).catch(() => ({})),
+    dropboxAccount().catch(() => null),
   ]);
   const notes = tasks.filter((t) => t.kind === "reminder" && t.status === "pending" && t.due_at);
   const teamMembers = [...new Set(users.filter((u) => u.active !== false).map((u) => u.name || u.email).filter(Boolean))];
@@ -29,7 +31,8 @@ export default async function AccountContent({ params, searchParams }) {
 
       <AccountTabs accountId={acct.id} active="content" role={role} />
 
-      <ContentBoard clientId={acct.client_id} client={acct.client} items={items} socials={socials} editId={searchParams?.edit || null} notes={notes} teamMembers={teamMembers} />
+      <ContentBoard clientId={acct.client_id} client={acct.client} items={items} socials={socials} editId={searchParams?.edit || null} notes={notes} teamMembers={teamMembers}
+        dropbox={!!dbx} dropboxFolder={brand?.dropbox_folder || ""} />
     </Shell>
   );
 }

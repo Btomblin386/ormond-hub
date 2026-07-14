@@ -116,6 +116,17 @@ Also requested (not yet scheduled):
 - Push/email alerts for approvals + missed schedules (currently in-app notifications only).
 - Full top-nav conversion (OneUp-style) — layout is widened but nav still left-rail.
 
+## Recently shipped (2026-07-14, Dropbox + bulk + crash fix)
+- **Dropbox** — agency-wide connection (oauth-dropbox edge fn; oauth_tokens provider 'dropbox';
+  secrets DROPBOX_APP_KEY/SECRET + Vercel env DROPBOX_APP_KEY). Composer gains "Add from Dropbox":
+  browse → import copies files into content-media (temp links expire, so never stored directly).
+  Per-brand default folder in Settings (`brand_settings.dropbox_folder`). Setup: create a scoped
+  Dropbox app (files.metadata.read + files.content.read), redirect URI
+  `https://<domain>/api/oauth/dropbox/callback`, connect from any brand's Settings.
+- **Bulk select** on the content list — select all / per-row checkboxes → Submit / Approve / Delete.
+- **Crash fix** — "Open in composer" from a brand calendar 500'd (`contentForClient` lacked client_id →
+  /accounts/undefined/...); also accountById now returns null on malformed ids (404 instead of 500).
+
 ## Recently shipped (2026-07-14, calendar notes + modal)
 - **Day-action modal** — left-click (or right-click) any day on an account's content calendar →
   "Create post / Add note" chooser. Notes are `account_tasks` reminders with `created_by` (stamped

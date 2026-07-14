@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { fileToB64, cropToRatio, uploadImage, imageSize, IG_RATIOS, IG_FEED_MIN, IG_FEED_MAX, videoMeta, validateReel } from "../lib/media";
+import DropboxPicker from "./DropboxPicker";
 
 const STATUS_LABEL = {
   draft: "Draft", needs_approval: "Needs approval", needs_revisions: "Needs revisions", approved: "Approved",
@@ -95,11 +96,12 @@ function buildOptions(socials) {
   return out;
 }
 
-function Composer({ clientId, socials, seedDate, editItem, onDone }) {
+function Composer({ clientId, socials, seedDate, editItem, onDone, dropbox, dropboxFolder }) {
   const router = useRouter();
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [dbxOpen, setDbxOpen] = useState(false);
   const options = useMemo(() => buildOptions(socials), [socials]);
 
   const [selKeys, setSelKeys] = useState(() => {
@@ -307,7 +309,11 @@ function Composer({ clientId, socials, seedDate, editItem, onDone }) {
               </select>
             </div>
           </div>
-          <input type="file" accept="image/*" multiple onChange={onFiles} disabled={uploading} />
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <input type="file" accept="image/*" multiple onChange={onFiles} disabled={uploading} />
+            {dropbox && <button type="button" className="social-btn" onClick={() => setDbxOpen(true)}>📦 Add from Dropbox</button>}
+          </div>
+          {dbxOpen && <DropboxPicker startPath={dropboxFolder || ""} onAdd={(url) => setMedia((m) => [...m, url])} onClose={() => setDbxOpen(false)} />}
           {Object.entries(progress).map(([name, pct]) => (
             <div key={name} className="upl-prog">
               <div className="upl-bar"><div className="upl-fill" style={{ width: pct + "%" }} /></div>
@@ -409,7 +415,7 @@ function TypePicker({ value, onChange }) {
 }
 
 /* ---------------- Main ---------------- */
-export default function ContentManager({ clientId, client, items, socials, open: openProp, setOpen: setOpenProp, seedDate, editId }) {
+export default function ContentManager({ clientId, client, items, socials, open: openProp, setOpen: setOpenProp, seedDate, editId, dropbox, dropboxFolder }) {
   const router = useRouter();
   const [openLocal, setOpenLocal] = useState(false);
   const open = openProp !== undefined ? openProp : openLocal;
@@ -417,8 +423,28 @@ export default function ContentManager({ clientId, client, items, socials, open:
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
   const [editItem, setEditItem] = useState(null);
+  const [checked, setChecked] = useState([]);
   const multiIdent = socials.length > 1;
   function flash(t) { setMsg(t); setTimeout(() => setMsg(""), 6000); }
+  const toggleCheck = (id) => setChecked((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
+  const selectable = items.filter((it) => it.status !== "published" && it.status !== "publishing").map((it) => it.id);
+
+  async function bulk(op, opts = {}) {
+    if (!checked.length) return;
+    if (op === "delete" && !window.confirm(`Delete ${checked.length} item(s)?`)) return;
+    setBusy("bulk");
+    try {
+      for (const id of checked) {
+        await fetch("/api/content", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(op === "delete" ? { op: "delete", id } : { op: "status", id, status: op, approvedBy: "agency", ...opts }),
+        });
+      }
+      flash(`${checked.length} item(s) ${op === "delete" ? "deleted" : op === "approved" ? "approved" : "submitted"}.`);
+      setChecked([]);
+      router.refresh();
+    } finally { setBusy(""); }
+  }
 
   function startEdit(it) {
     setEditItem(it);
@@ -473,16 +499,37 @@ export default function ContentManager({ clientId, client, items, socials, open:
       {open && (
         <>
           {editItem && <div className="cmp-editing">Editing an existing {STATUS_LABEL[editItem.status]?.toLowerCase()} post</div>}
-          <Composer key={editItem?.id || "new"} clientId={clientId} socials={socials} seedDate={seedDate} editItem={editItem} onDone={(m) => { flash(m); setOpen(false); setEditItem(null); }} />
+          <Composer key={editItem?.id || "new"} clientId={clientId} socials={socials} seedDate={seedDate} editItem={editItem} dropbox={dropbox} dropboxFolder={dropboxFolder} onDone={(m) => { flash(m); setOpen(false); setEditItem(null); }} />
         </>
       )}
 
       {items.length === 0 ? (
         <div className="muted" style={{ fontSize: 13 }}>No content yet.</div>
       ) : (
+        <>
+        {selectable.length > 0 && (
+          <div className="bulk-bar">
+            <label className="bulk-all">
+              <input type="checkbox"
+                checked={checked.length > 0 && checked.length === selectable.length}
+                onChange={(e) => setChecked(e.target.checked ? selectable : [])} />
+              {checked.length ? `${checked.length} selected` : "Select all"}
+            </label>
+            {checked.length > 0 && (
+              <div className="bulk-actions">
+                <button className="social-btn" disabled={busy === "bulk"} onClick={() => bulk("needs_approval")}>Submit</button>
+                <button className="cal-approve" disabled={busy === "bulk"} onClick={() => bulk("approved")}>Approve</button>
+                <button className="rule-del" disabled={busy === "bulk"} onClick={() => bulk("delete")}>Delete</button>
+              </div>
+            )}
+          </div>
+        )}
         <div className="content-list">
           {items.map((it) => (
             <div key={it.id} className="content-row">
+              {it.status !== "published" && it.status !== "publishing" && (
+                <input type="checkbox" className="row-check" checked={checked.includes(it.id)} onChange={() => toggleCheck(it.id)} />
+              )}
               {Array.isArray(it.media_urls) && it.media_urls[0] && <img className="content-thumb" src={it.media_urls[0]} alt="" />}
               <div className="content-main">
                 <div className="content-top">
@@ -513,6 +560,7 @@ export default function ContentManager({ clientId, client, items, socials, open:
             </div>
           ))}
         </div>
+        </>
       )}
     </div>
   );

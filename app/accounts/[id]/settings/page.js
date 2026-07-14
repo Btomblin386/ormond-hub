@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Shell from "../../../../components/Shell";
 import AccountTabs from "../../../../components/AccountTabs";
 import AccountSettings from "../../../../components/AccountSettings";
-import { accountById, socialsForClient, ga4PropertyForClient, brandSettings } from "../../../../lib/db";
+import { accountById, socialsForClient, ga4PropertyForClient, brandSettings, dropboxAccount } from "../../../../lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -11,10 +11,11 @@ export default async function AccountSettingsPage({ params }) {
   const acct = await accountById(params.id);
   if (!acct) notFound();
 
-  const [socials, ga4, brand] = await Promise.all([
+  const [socials, ga4, brand, dbx] = await Promise.all([
     socialsForClient(acct.client_id),
     ga4PropertyForClient(acct.client_id),
     brandSettings(acct.client_id),
+    dropboxAccount().catch(() => null),
   ]);
 
   return (
@@ -24,7 +25,7 @@ export default async function AccountSettingsPage({ params }) {
 
       <AccountTabs accountId={acct.id} active="settings" />
 
-      <AccountSettings acct={acct} socials={socials} ga4={ga4} brand={brand} />
+      <AccountSettings acct={acct} socials={socials} ga4={ga4} brand={brand} dropboxEmail={dbx?.account_email || null} />
     </Shell>
   );
 }
