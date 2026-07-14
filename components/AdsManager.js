@@ -1,0 +1,118 @@
+"use client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+
+const money = (n) => "$" + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
+
+export default function AdsManager({ accountId, accountExt, cap, campaigns, writes }) {
+  const router = useRouter();
+  const [capInput, setCapInput] = useState(cap == null ? "" : String(cap));
+  const [busy, setBusy] = useState("");
+  const [msg, setMsg] = useState("");
+  const [budgets, setBudgets] = useState({});
+
+  function flash(text) { setMsg(text); setTimeout(() => setMsg(""), 6000); }
+
+  async function saveCap() {
+    setBusy("cap");
+    try {
+      const r = await fetch("/api/account-settings", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId, cap: capInput }),
+      });
+      const d = await r.json();
+      flash(d.error ? `Error: ${d.error}` : `Daily cap saved: ${d.cap == null ? "none" : money(d.cap)}.`);
+      router.refresh();
+    } finally { setBusy(""); }
+  }
+
+  async function manage(payload, confirmText) {
+    if (confirmText && !window.confirm(confirmText)) return;
+    setBusy(payload.target_id + payload.action);
+    try {
+      const r = await fetch("/api/manage", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payload, account_ext: accountExt }),
+      });
+      const d = await r.json();
+      flash(d.error ? `Error: ${d.error}` : "Done.");
+      router.refresh();
+    } finally { setBusy(""); }
+  }
+
+  return (
+    <div className="panel">
+      <h2>Ads management</h2>
+      <p className="note">Pause/resume campaigns and adjust budgets. Nothing is created here except paused drafts; budget changes are capped, and every action is logged below.</p>
+
+      {msg && <div className="mng-msg">{msg}</div>}
+
+      <div className="mng-cap">
+        <label>Daily spend cap</label>
+        <span className="mng-dollar">$</span>
+        <input type="number" min="1" value={capInput} placeholder="none"
+          onChange={(e) => setCapInput(e.target.value)} />
+        <button onClick={saveCap} disabled={busy === "cap"}>{busy === "cap" ? "Saving…" : "Save cap"}</button>
+        <span className="mng-hint">Budget increases above this are blocked.</span>
+      </div>
+
+      <div className="mng-table-wrap">
+        <table>
+          <thead>
+            <tr><th>Campaign</th><th>Spend (window)</th><th>New daily budget</th><th>Controls</th></tr>
+          </thead>
+          <tbody>
+            {campaigns.length === 0 && <tr><td colSpan={4} className="muted">No managed campaigns in this window.</td></tr>}
+            {campaigns.map((c) => (
+              <tr key={c.campaign_id}>
+                <td>{c.campaign}</td>
+                <td>{money(c.spend)}</td>
+                <td>
+                  <div className="mng-budget">
+                    <span>$</span>
+                    <input type="number" min="1" placeholder="—"
+                      value={budgets[c.campaign_id] ?? ""}
+                      onChange={(e) => setBudgets({ ...budgets, [c.campaign_id]: e.target.value })} />
+                    <button
+                      disabled={!budgets[c.campaign_id]}
+                      onClick={() => manage(
+                        { action: "update_budget", target_id: c.campaign_id, target_type: "campaign", daily_budget: budgets[c.campaign_id] },
+                        `Set ${c.campaign} to $${budgets[c.campaign_id]}/day?`
+                      )}
+                    >Apply</button>
+                  </div>
+                </td>
+                <td>
+                  <div className="mng-controls">
+                    <button className="mng-pause"
+                      onClick={() => manage({ action: "update_status", target_id: c.campaign_id, target_type: "campaign", status: "PAUSED" }, `Pause ${c.campaign}?`)}>
+                      Pause
+                    </button>
+                    <button className="mng-resume"
+                      onClick={() => manage({ action: "update_status", target_id: c.campaign_id, target_type: "campaign", status: "ACTIVE" }, `Resume ${c.campaign}? This can spend money.`)}>
+                      Resume
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {writes.length > 0 && (
+        <div className="mng-log">
+          <div className="studio-h">Recent actions (audit log)</div>
+          {writes.map((w, i) => (
+            <div key={i} className={"log-row " + w.status}>
+              <span className="log-action">{w.action.replace(/_/g, " ")}</span>
+              <span className="log-target">{w.target_type || ""} {w.target_id ? "#" + String(w.target_id).slice(-6) : ""}</span>
+              <span className={"log-status " + w.status}>{w.status}</span>
+              <span className="log-when">{new Date(w.created_at).toLocaleString()}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
