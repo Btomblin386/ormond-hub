@@ -37,8 +37,10 @@ oauth_tokens (FB Login user tokens), app_users, user_profiles.
 - meta-create (v5), meta-manage (v2) — write campaigns/ads with guardrails + audit; applies account url_params.
 - meta-upload-image, meta-audiences.
 - content-upload — stores image (base64 or url) to `content-media` public bucket.
-- content-publish (v5) — publishes approved/scheduled content to FB/IG (feed/reel/story), first comment,
-  transient-vs-permanent error classification.
+- content-publish (v6) — publishes approved/scheduled content to FB/IG (feed/reel/story), first comment,
+  transient-vs-permanent error classification. Reliability: skips channels that already have a post id
+  (no double-post on retry of a half-failed multi-channel post), reclaims items stuck in `publishing`
+  >10 min, auto-retries transient failures up to 3× (`content_items.retry_count`), batch of 10/run.
 - social-manage — discover/connect FB pages + IG.
 - brand-listen (v8) — polls brand_sources: meta (tags/visitor posts/IG tags), hashtag (IG hashtag search),
   rss; sets mtype + thumbnails.
@@ -75,10 +77,8 @@ FB Login redirect URI to whitelist: `https://<prod-domain>/api/oauth/facebook/ca
   NotificationsFeed, TeamManager, OnboardClient. Media utils in `lib/media.js` (crop/upload-progress/video-validate).
 
 ## Pending backlog (in priority order chosen by Brooks)
-1. **Agency Overview redesign** — replace blended spend/revenue chart with per-account 7-day trend + green/red
-   delta arrows; click opens a quick-analytics window (% change, adjustable dates). (NEXT)
-2. **Actionable Campaign Studio chat** — make the chat DO things (e.g. add UTM params to live campaigns) with
-   guardrails + approval, instead of only giving instructions.
+1. **Actionable Campaign Studio chat** — make the chat DO things (e.g. add UTM params to live campaigns) with
+   guardrails + approval, instead of only giving instructions. (NEXT)
 Also requested (not yet scheduled):
 - Repurpose Studio rework (fix brand-kit fit / black-bars, matching buttons; possible Canva integration later).
 - Dropbox integration (browse + pin a default folder per brand to grab photos).
@@ -86,6 +86,15 @@ Also requested (not yet scheduled):
 - Social insights tab (pin/enter starting stats + date, track over selectable periods).
 - Push/email alerts for approvals + missed schedules (currently in-app notifications only).
 - Full top-nav conversion (OneUp-style) — layout is widened but nav still left-rail.
+
+## Recently shipped (2026-07-14)
+- **Agency Overview redesign** — per-account 7d trend cards (sparkline + green/red deltas vs prior 7d,
+  spend arrow neutral); click opens quick-analytics modal (KPIs + % change vs preceding equal window,
+  7/14/30/90d presets + custom dates) via new `/api/analytics` (creator/client-blocked in middleware).
+- **content-publish v6 reliability batch** (see edge-function notes above) + `retry_count` migration;
+  posts stuck in `publishing` >20 min now surface in Agency Overview notifications.
+- **Local verification recipe** — `.claude/skills/verify/SKILL.md`: SSL-enabled Docker Postgres with
+  seeded schema + Playwright drive (lib/db.js requires SSL even locally).
 
 ## Gotchas
 - Git-in-Dropbox caused lock collisions → repo moved to Desktop. If `.git/*.lock` sticks, `rm -f .git/*.lock`.

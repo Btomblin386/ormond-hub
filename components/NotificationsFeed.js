@@ -6,8 +6,8 @@ import { useState } from "react";
 export default function NotificationsFeed({ data }) {
   const router = useRouter();
   const [busy, setBusy] = useState("");
-  const { todos = [], failed = [], ruleEvents = [], insights = [], overdue = [] } = data || {};
-  const total = todos.length + failed.length + ruleEvents.length + insights.length + overdue.length;
+  const { todos = [], failed = [], ruleEvents = [], insights = [], overdue = [], stuck = [] } = data || {};
+  const total = todos.length + failed.length + ruleEvents.length + insights.length + overdue.length + stuck.length;
 
   async function approve(id) {
     setBusy(id);
@@ -46,6 +46,15 @@ export default function NotificationsFeed({ data }) {
             <div className="notif-sub">{t.caption?.slice(0, 90) || "(no caption)"}</div>
           </div>
           <button className="cal-approve" disabled={busy === t.id} onClick={() => approve(t.id)}>Approve</button>
+        </div>
+      ))}
+      {stuck.map((t) => (
+        <div key={"st" + t.id} className="notif fail">
+          <span className="notif-dot fail" />
+          <div className="notif-body">
+            <div className="notif-title">Post stuck publishing · <b>{t.client}</b> <span className="notif-when">since {new Date(t.created_at).toLocaleString()}</span></div>
+            <div className="notif-sub">Publisher hasn&apos;t completed this post — check the function logs if it persists. {t.caption?.slice(0, 70) || ""}</div>
+          </div>
         </div>
       ))}
       {failed.map((t) => (
