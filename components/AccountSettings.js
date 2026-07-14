@@ -12,6 +12,7 @@ export default function AccountSettings({ acct, socials, ga4, brand }) {
   const [name, setName] = useState(acct.client);
   const [desc, setDesc] = useState(brand?.business_desc || "");
   const [cap, setCap] = useState(acct.max_daily_budget ?? "");
+  const [tags, setTags] = useState((acct.tags || []).join(", "));
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
   function flash(t) { setMsg(t); setTimeout(() => setMsg(""), 6000); }
@@ -32,6 +33,7 @@ export default function AccountSettings({ acct, socials, ga4, brand }) {
     run("name", () => post("/api/account-settings", { clientId: acct.client_id, name: t }), { reload: true });
   };
   const saveDesc = () => run("desc", () => post("/api/brand-settings", { clientId: acct.client_id, settings: { ...(brand || {}), business_desc: desc } }));
+  const saveTags = () => run("tags", () => post("/api/account-settings", { clientId: acct.client_id, tags: tags.split(",").map((t) => t.trim()).filter(Boolean) }));
   const saveCap = () => run("cap", () => post("/api/account-settings", { accountId: acct.ad_account_id, cap }));
   const disconnectSocial = (s) => {
     if (!window.confirm(`Disconnect ${s.fb_page_name || "this Page"}${s.ig_username ? " / @" + s.ig_username : ""}? Scheduled posts for this identity will fail until it's reconnected.`)) return;
@@ -57,6 +59,11 @@ export default function AccountSettings({ acct, socials, ga4, brand }) {
           <label>What this business sells<div className="muted" style={{ fontSize: 10.5, fontWeight: 400 }}>guides all AI features</div></label>
           <textarea rows={2} value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="e.g. an adventure-motorcycle luggage and soft-bag maker for long-distance riders" />
           <button className="social-btn" onClick={saveDesc} disabled={busy === "desc"}>Save</button>
+        </div>
+        <div className="set-row">
+          <label>Tags<div className="muted" style={{ fontSize: 10.5, fontWeight: 400 }}>comma-separated · shown on the accounts list</div></label>
+          <input type="text" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="e.g. fantasy league, retainer, priority" />
+          <button className="social-btn" onClick={saveTags} disabled={busy === "tags"}>Save tags</button>
         </div>
       </div>
 

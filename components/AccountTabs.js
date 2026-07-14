@@ -22,6 +22,11 @@ export default function AccountTabs({ accountId, active, days = 30, role = "agen
         </Link>
       )}
       {role === "agency" && (
+        <Link href={`/accounts/${accountId}/assistant`} className={"acct-tab" + (active === "assistant" ? " active" : "")}>
+          Assistant
+        </Link>
+      )}
+      {role === "agency" && (
         <Link href={`/accounts/${accountId}/settings`} className={"acct-tab" + (active === "settings" ? " active" : "")}>
           Settings
         </Link>

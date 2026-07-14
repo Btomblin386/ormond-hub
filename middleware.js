@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 const PUBLIC = ["/login", "/api/login", "/privacy", "/terms", "/data-deletion"];
 
 // Paid-marketing APIs that creators/clients may not call
-const PAID_APIS = ["/api/manage", "/api/create", "/api/rules", "/api/account-settings", "/api/campaign-plan", "/api/audiences", "/api/pin", "/api/users", "/api/analytics", "/api/analytics-summary", "/api/oauth"];
+const PAID_APIS = ["/api/manage", "/api/create", "/api/rules", "/api/account-settings", "/api/campaign-plan", "/api/audiences", "/api/pin", "/api/users", "/api/analytics", "/api/analytics-summary", "/api/oauth", "/api/tasks"];
 
 function b64urlFromBytes(bytes) {
   let bin = "";
@@ -81,8 +81,9 @@ export async function middleware(req) {
       pathname.startsWith("/reconciliation") ||
       pathname.startsWith("/onboard") ||
       /^\/accounts\/[^/]+$/.test(pathname) ||        // paid-marketing account root
-      /^\/accounts\/[^/]+\/google/.test(pathname) || // google analytics/ads tab
-      /^\/accounts\/[^/]+\/settings/.test(pathname); // account settings
+      /^\/accounts\/[^/]+\/google/.test(pathname) ||    // google analytics/ads tab
+      /^\/accounts\/[^/]+\/settings/.test(pathname) ||  // account settings
+      /^\/accounts\/[^/]+\/assistant/.test(pathname);   // account assistant
     if (blockedPage) {
       const url = req.nextUrl.clone();
       // send them to the content view (of that account if we can tell)

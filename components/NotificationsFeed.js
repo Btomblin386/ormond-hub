@@ -6,8 +6,8 @@ import { useState } from "react";
 export default function NotificationsFeed({ data }) {
   const router = useRouter();
   const [busy, setBusy] = useState("");
-  const { todos = [], failed = [], ruleEvents = [], insights = [], overdue = [], stuck = [] } = data || {};
-  const total = todos.length + failed.length + ruleEvents.length + insights.length + overdue.length + stuck.length;
+  const { todos = [], failed = [], ruleEvents = [], insights = [], overdue = [], stuck = [], reminders = [], taskResults = [] } = data || {};
+  const total = todos.length + failed.length + ruleEvents.length + insights.length + overdue.length + stuck.length + reminders.length + taskResults.length;
 
   async function approve(id) {
     setBusy(id);
@@ -23,11 +23,38 @@ export default function NotificationsFeed({ data }) {
       router.refresh();
     } finally { setBusy(""); }
   }
+  async function taskOp(id, op) {
+    setBusy(id);
+    try {
+      await fetch("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op, id }) });
+      router.refresh();
+    } finally { setBusy(""); }
+  }
 
   if (total === 0) return <div className="muted" style={{ fontSize: 13 }}>All clear — nothing needs your attention.</div>;
 
   return (
     <div className="notif-list">
+      {reminders.map((t) => (
+        <div key={"rm" + t.id} className="notif todo">
+          <span className="notif-dot approval" />
+          <div className="notif-body">
+            <div className="notif-title">⏰ Reminder · <b>{t.client}</b> <span className="notif-when">{new Date(t.due_at).toLocaleString()}</span></div>
+            <div className="notif-sub">{t.title}</div>
+          </div>
+          <button className="rule-ack" disabled={busy === t.id} onClick={() => taskOp(t.id, "dismiss")}>Done</button>
+        </div>
+      ))}
+      {taskResults.map((t) => (
+        <div key={"tk" + t.id} className={"notif " + (t.status === "failed" ? "fail" : "insight")}>
+          <span className={"notif-dot " + (t.status === "failed" ? "fail" : "opportunity")} />
+          <div className="notif-body">
+            <div className="notif-title">🤖 Assistant {t.status === "failed" ? "task failed" : "finished a task"} · <Link href={`/accounts/${t.client_id}/assistant`}>{t.client}</Link></div>
+            <div className="notif-sub">{t.status === "failed" ? (t.error || t.title) : (t.result?.slice(0, 160) || t.title)}</div>
+          </div>
+          <button className="rule-ack" disabled={busy === t.id} onClick={() => taskOp(t.id, "ack")}>Dismiss</button>
+        </div>
+      ))}
       {overdue.map((t) => (
         <div key={"od" + t.id} className="notif overdue">
           <span className="notif-dot overdue" />

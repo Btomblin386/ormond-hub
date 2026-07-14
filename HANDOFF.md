@@ -116,6 +116,16 @@ Also requested (not yet scheduled):
 - Push/email alerts for approvals + missed schedules (currently in-app notifications only).
 - Full top-nav conversion (OneUp-style) — layout is widened but nav still left-rail.
 
+## Recently shipped (2026-07-14, account assistant)
+- **Account Assistant tab** (agency-only) — free-text AI tasks per brand. New `account-task` edge fn runs
+  Claude with server-side web_search + hub tools (create_draft → draft content_items on the calendar,
+  add_reminder → dated reminders). Human approval flow remains the gate; assistant never publishes.
+  Queue in `account_tasks` (kind 'task'), fired instantly via pg_net from /api/tasks with a */10 cron
+  sweep as fallback. Results + failures surface in agency Notifications (ack to dismiss).
+- **Reminders** — `account_tasks` kind 'reminder' (manual or assistant-created); surface in Notifications
+  from 1 day before due; "Done" dismisses.
+- **Brand tags** — `clients.tags text[]`, edited in Settings, shown as pills on the accounts list.
+
 ## Recently shipped (2026-07-14, multi-identity + settings)
 - **Multiple Pages per brand** — social_accounts is now one-to-many per client (e.g. Bent Rim Grill +
   Frio Canyon Motorcycle Stop). Composer "Post to" lists every identity's FB/IG as separate options;

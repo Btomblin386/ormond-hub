@@ -39,7 +39,7 @@ export default async function Overview({ searchParams }) {
   ]);
 
   const blended = roas(totals.revenue, totals.spend);
-  const notifCount = notifications.todos.length + notifications.failed.length + notifications.ruleEvents.length + notifications.insights.length + (notifications.overdue?.length || 0) + (notifications.stuck?.length || 0);
+  const notifCount = notifications.todos.length + notifications.failed.length + notifications.ruleEvents.length + notifications.insights.length + (notifications.overdue?.length || 0) + (notifications.stuck?.length || 0) + (notifications.reminders?.length || 0) + (notifications.taskResults?.length || 0);
 
   return (
     <Shell crumb={<><b>Agency Overview</b></>}>

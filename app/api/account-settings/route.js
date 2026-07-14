@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
-import { setAccountCap, setAccountUrlParams, renameClient, deleteSocialAccount, deleteGa4Property } from "../../../lib/db";
+import { setAccountCap, setAccountUrlParams, renameClient, deleteSocialAccount, deleteGa4Property, setClientTags } from "../../../lib/db";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req) {
   try {
     const body = await req.json();
+
+    // Tags on the brand (shown in the accounts list; free-form labels).
+    if (body.clientId && Array.isArray(body.tags)) {
+      const tags = body.tags.map((t) => String(t).trim()).filter(Boolean).slice(0, 12);
+      await setClientTags(body.clientId, tags);
+      return NextResponse.json({ ok: true, tags });
+    }
 
     // Disconnect a social identity (Page+IG pair) from its client.
     if (body.disconnectSocialId) {

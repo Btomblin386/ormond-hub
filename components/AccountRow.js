@@ -29,6 +29,7 @@ export default function AccountRow({ account, days }) {
         {account.platform
           ? <span className={"pill" + (account.platform === "google" ? " google" : "")}>{account.platform}</span>
           : <span className="pill content">content</span>}
+        {(account.tags || []).map((t) => <span key={t} className="tag-pill">{t}</span>)}
         <button className="row-rename" title="Rename brand" onClick={rename}>✎</button>
       </td>
       <td>{money(account.spend)}</td>
