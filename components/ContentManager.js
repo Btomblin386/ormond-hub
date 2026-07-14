@@ -1,6 +1,7 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { fileToB64, cropToRatio, uploadImage, imageSize, IG_RATIOS, IG_FEED_MIN, IG_FEED_MAX, videoMeta, validateReel } from "../lib/media";
 
 const STATUS_LABEL = {
   draft: "Draft", needs_approval: "Needs approval", approved: "Approved",
@@ -9,15 +10,7 @@ const STATUS_LABEL = {
 const LIMITS = { instagram: 2200, facebook: 63206 };
 const CHAN_LABEL = { facebook: "Facebook", instagram: "Instagram" };
 const TYPES = ["feed", "reel", "story"];
-
-function fileToB64(file) {
-  return new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => res(r.result);
-    r.onerror = rej;
-    r.readAsDataURL(file);
-  });
-}
+const CROP_OPTS = [["original", "Original"], ["1:1", "Square 1:1"], ["4:5", "Portrait 4:5"], ["1.91:1", "Landscape 1.91:1"], ["9:16", "Story/Reel 9:16"]];
 
 /* ---------------- Social connection ---------------- */
 function SocialConnect({ clientId, client, social }) {
@@ -107,6 +100,10 @@ function Composer({ clientId, social, seedDate, editItem, onDone }) {
   const [firstComment, setFirstComment] = useState(editItem?.first_comment || "");
   const [scheduledAt, setScheduledAt] = useState(seedDate || (editItem?.scheduled_at ? toLocalInput(editItem.scheduled_at) : nowPlus30()));
   const [activeTab, setActiveTab] = useState(channels[0] || "facebook");
+  const [cropRatio, setCropRatio] = useState("original");
+  const [progress, setProgress] = useState({});
+  const [igWarn, setIgWarn] = useState("");
+  const [videoWarn, setVideoWarn] = useState("");
 
   function flash(t) { setMsg(t); setTimeout(() => setMsg(""), 7000); }
   function toggleChannel(c) {
@@ -125,17 +122,33 @@ function Composer({ clientId, social, seedDate, editItem, onDone }) {
   const usesVideo = plan.some((p) => p.type === "reel");
   const usesImage = plan.some((p) => p.type === "feed" || p.type === "story");
 
+  // Validate reel video specs (best-effort; cross-origin may block metadata)
+  useEffect(() => {
+    if (!usesVideo || !videoUrl.trim()) { setVideoWarn(""); return; }
+    let cancel = false;
+    videoMeta(videoUrl.trim()).then((m) => { if (!cancel) setVideoWarn(validateReel(m) || ""); });
+    return () => { cancel = true; };
+  }, [usesVideo, videoUrl]);
+
   async function onFiles(e) {
     const files = [...e.target.files]; if (!files.length) return;
-    setUploading(true);
+    setUploading(true); setIgWarn("");
     try {
       for (const f of files) {
-        const b64 = await fileToB64(f);
-        const r = await fetch("/api/content-media", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image_base64: b64, filename: f.name }) });
-        const d = await r.json();
-        if (d.url) setMedia((m) => [...m, d.url]); else flash("Upload failed: " + (d.error || "unknown"));
+        let b64 = await fileToB64(f);
+        if (cropRatio !== "original") b64 = await cropToRatio(b64, IG_RATIOS[cropRatio]);
+        if (channels.includes("instagram") && baseType === "feed") {
+          try {
+            const s = await imageSize(b64);
+            if (s.ratio < IG_FEED_MIN - 0.02 || s.ratio > IG_FEED_MAX + 0.02) setIgWarn("This image's shape is outside Instagram feed limits (portrait 4:5 to landscape 1.91:1). Pick a crop above so it isn't rejected.");
+          } catch {}
+        }
+        setProgress((p) => ({ ...p, [f.name]: 0 }));
+        const d = await uploadImage({ image_base64: b64, filename: f.name, onProgress: (pct) => setProgress((p) => ({ ...p, [f.name]: pct })) });
+        if (d.url) setMedia((m) => [...m, d.url]);
+        setProgress((p) => { const n = { ...p }; delete n[f.name]; return n; });
       }
-    } finally { setUploading(false); }
+    } catch (err) { flash("Upload failed: " + (err.message || err)); } finally { setUploading(false); }
   }
 
   function validate() {
@@ -241,13 +254,28 @@ function Composer({ clientId, social, seedDate, editItem, onDone }) {
         <div className="cmp-field">
           <label>Video URL (Reel)</label>
           <input type="url" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://…/video.mp4 (public MP4)" />
-          <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>Reels publish from a public MP4 URL. Direct video upload is coming soon.</div>
+          <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>Reels publish from a public MP4 URL. Instagram: ≤ 90s, 9:16, 1080px wide. Direct upload coming soon.</div>
+          {videoWarn && <div className="cmp-warn">⚠ {videoWarn}</div>}
         </div>
       ) : (
         <div className="cmp-field">
-          <label>Images {igActive && <span className="muted">· 1 for a Story, up to 10 for a carousel</span>}</label>
+          <div className="cmp-label-row">
+            <label>Images {igActive && <span className="muted">· 1 for a Story, up to 10 for a carousel</span>}</label>
+            <div className="crop-sel">
+              <span className="muted" style={{ fontSize: 11 }}>Crop:</span>
+              <select value={cropRatio} onChange={(e) => setCropRatio(e.target.value)}>
+                {CROP_OPTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+              </select>
+            </div>
+          </div>
           <input type="file" accept="image/*" multiple onChange={onFiles} disabled={uploading} />
-          {uploading && <div className="muted" style={{ fontSize: 11 }}>Uploading…</div>}
+          {Object.entries(progress).map(([name, pct]) => (
+            <div key={name} className="upl-prog">
+              <div className="upl-bar"><div className="upl-fill" style={{ width: pct + "%" }} /></div>
+              <span className="upl-pct">{pct}%</span>
+            </div>
+          ))}
+          {igWarn && <div className="cmp-warn">⚠ {igWarn}</div>}
           {media.length > 0 && (
             <div className="cmp-thumbs">
               {media.map((u, j) => (
@@ -407,7 +435,12 @@ export default function ContentManager({ clientId, client, items, social, open: 
                   <span className="content-when">{it.scheduled_at ? new Date(it.scheduled_at).toLocaleString() : it.published_at ? "Published " + new Date(it.published_at).toLocaleDateString() : "no date"}</span>
                 </div>
                 <div className="content-cap">{it.caption?.slice(0, 140) || "(no caption)"}</div>
-                {it.error && <div className="push-err">{it.error}</div>}
+                {it.error && (
+                  <div className={"content-err " + (it.error_kind || "permanent")}>
+                    <span className="err-flag">{it.error_kind === "transient" ? "⏳ Temporary — retry shortly" : "⚠ Needs a fix"}</span>
+                    <span className="err-txt">{it.error}</span>
+                  </div>
+                )}
               </div>
               <div className="content-actions">
                 {it.status !== "published" && it.status !== "publishing" && <button onClick={() => startEdit(it)}>Edit</button>}

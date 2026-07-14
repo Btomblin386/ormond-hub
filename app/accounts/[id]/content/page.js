@@ -17,7 +17,7 @@ export default async function AccountContent({ params }) {
   ]);
 
   return (
-    <Shell crumb={<><Link href="/accounts">Accounts</Link> · <b>{acct.client}</b> · Content</>}>
+    <Shell wide crumb={<><Link href="/accounts">Accounts</Link> · <b>{acct.client}</b> · Content</>}>
       <h1>{acct.client} <span className="pill">content</span></h1>
       <div className="sub">Posts &amp; calendar</div>
 

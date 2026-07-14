@@ -52,7 +52,7 @@ export default function NotificationsFeed({ data }) {
         <div key={t.id} className="notif fail">
           <span className="notif-dot fail" />
           <div className="notif-body">
-            <div className="notif-title">Post failed · <b>{t.client}</b></div>
+            <div className="notif-title">Post failed · <b>{t.client}</b> <span className={"err-flag inline " + (t.error_kind || "permanent")}>{t.error_kind === "transient" ? "retry shortly" : "needs a fix"}</span></div>
             <div className="notif-sub">{t.error}</div>
           </div>
         </div>

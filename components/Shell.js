@@ -20,7 +20,7 @@ const ENGAGE_SECTIONS = [
   { hash: "repurpose", label: "Repurpose Studio" },
 ];
 
-export default function Shell({ crumb, children }) {
+export default function Shell({ crumb, children, wide }) {
   const path = usePathname();
   const params = useSearchParams();
   const router = useRouter();
@@ -134,7 +134,7 @@ export default function Shell({ crumb, children }) {
             ))}
           </div>
         </div>
-        <div className="content">{children}</div>
+        <div className={"content" + (wide ? " wide" : "")}>{children}</div>
       </main>
     </div>
   );
