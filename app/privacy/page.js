@@ -35,6 +35,23 @@ export default function Privacy() {
         <li>To create, review, and manage advertising campaigns on behalf of those businesses (always with human approval before anything spends).</li>
       </ul>
 
+      <h2>Google user data</h2>
+      <p>
+        When a Google account is connected via Google Sign-In, the Service requests read-only access to Google
+        Analytics (<code>analytics.readonly</code>) and Google Ads (<code>adwords</code>) data, plus the connecting
+        account&apos;s email address to label the connection. We use this data solely to provide reporting,
+        attribution reconciliation, and advertising insights inside the Service for the business that owns it.
+        We do not sell Google user data, do not use it for advertising targeting of individuals, and do not
+        transfer it except to the service providers listed below as needed to operate the Service. Aggregate
+        metrics (never credentials) may be processed by our AI provider to generate written insights. Our use and
+        transfer of information received from Google APIs adheres to the{" "}
+        <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noreferrer">
+          Google API Services User Data Policy
+        </a>, including the Limited Use requirements. Access can be revoked at any time from your{" "}
+        <a href="https://myaccount.google.com/permissions" target="_blank" rel="noreferrer">Google Account permissions</a>{" "}
+        page, and stored Google data is deleted on request (see below).
+      </p>
+
       <h2>Sharing and processors</h2>
       <p>We do not sell data. We use a small number of service providers to operate the Service:</p>
       <ul>

@@ -32,6 +32,13 @@ export async function middleware(req) {
   const { pathname } = req.nextUrl;
   if (PUBLIC.some((p) => pathname.startsWith(p))) return NextResponse.next();
 
+  // The root is reachable logged-out: app/page.js shows a public landing page
+  // (required as the OAuth "application home page") and the dashboard only
+  // renders for a valid session.
+  if (pathname === "/" && !req.cookies.get("hub_session") && !req.cookies.get("hub_auth")) {
+    return NextResponse.next();
+  }
+
   const secret = process.env.DASHBOARD_PASSWORD;
   let session = null;
   const tok = req.cookies.get("hub_session")?.value;

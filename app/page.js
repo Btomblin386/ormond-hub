@@ -5,10 +5,29 @@ import NotificationsFeed from "../components/NotificationsFeed";
 import ContentCalendar from "../components/ContentCalendar";
 import { agencyTotals, accountsList, accountsTrendDaily, agencyNotifications, contentCalendar, lastFullDataDate } from "../lib/db";
 import { money, num, roas, roasClass } from "../lib/format";
+import { getSession } from "../lib/session";
 
 export const dynamic = "force-dynamic";
 
+// Public landing (the OAuth consent screen's "application home page").
+// The dashboard below only renders for a valid session.
+function Landing() {
+  return (
+    <div className="landing">
+      <h1>Ormond Hub</h1>
+      <p className="landing-tag">Ormond Brand Consulting&apos;s private client platform — ad performance analytics,
+        Meta ↔ GA4 reconciliation, content scheduling &amp; approvals, and brand listening for the businesses we manage.</p>
+      <a className="landing-btn" href="/login">Log in</a>
+      <div className="landing-links">
+        <a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Service</a> · <a href="/data-deletion">Data Deletion</a>
+        {" "}· <a href="mailto:brooks@ormondbrandconsulting.com">Contact</a>
+      </div>
+    </div>
+  );
+}
+
 export default async function Overview({ searchParams }) {
+  if (!getSession()) return <Landing />;
   const days = Number(searchParams?.days) || 30;
   const [totals, trendRows, accounts, notifications, calendar, lastFull] = await Promise.all([
     agencyTotals(days),
