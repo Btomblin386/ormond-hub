@@ -24,7 +24,7 @@ export default function ContentBoard({ clientId, client, items, social }) {
       <div id="calendar" className="panel">
         <h2>Calendar</h2>
         <p className="note">Scheduled and pending posts. Drag a post to reschedule, right-click a day to create one, or click an item to approve.</p>
-        <ContentCalendar items={calItems} onCreateOnDate={onCreateOnDate} />
+        <ContentCalendar items={calItems} onCreateOnDate={onCreateOnDate} title={client} />
       </div>
     </>
   );

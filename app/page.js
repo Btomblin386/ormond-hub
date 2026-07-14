@@ -38,7 +38,7 @@ export default async function Overview({ searchParams }) {
       <div className="panel">
         <h2>Content calendar</h2>
         <p className="note">All accounts&apos; scheduled and pending content in one place. Click any item to approve or send back.</p>
-        <ContentCalendar items={calendar} />
+        <ContentCalendar items={calendar} showClient />
       </div>
 
       <div className="cards">

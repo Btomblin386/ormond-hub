@@ -10,7 +10,12 @@ const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const pad = (n) => String(n).padStart(2, "0");
 function keyOf(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
 
-export default function ContentCalendar({ items, onCreateOnDate }) {
+function fmtTime(iso) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+export default function ContentCalendar({ items, onCreateOnDate, title, showClient }) {
   const router = useRouter();
   const [cursor, setCursor] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const [sel, setSel] = useState(null);
@@ -77,9 +82,12 @@ export default function ContentCalendar({ items, onCreateOnDate }) {
       )}
 
       <div className="cal-head">
-        <button onClick={() => setCursor(new Date(year, month - 1, 1))}>←</button>
-        <div className="cal-title">{monthName}</div>
-        <button onClick={() => setCursor(new Date(year, month + 1, 1))}>→</button>
+        {title && <div className="cal-client">{title}</div>}
+        <div className="cal-nav">
+          <button onClick={() => setCursor(new Date(year, month - 1, 1))}>←</button>
+          <div className="cal-title">{monthName}</div>
+          <button onClick={() => setCursor(new Date(year, month + 1, 1))}>→</button>
+        </div>
       </div>
 
       <div className="cal-grid cal-dow">{DOW.map((d) => <div key={d} className="cal-dowcell">{d}</div>)}</div>
@@ -100,8 +108,9 @@ export default function ContentCalendar({ items, onCreateOnDate }) {
               {dayItems.slice(0, 4).map((it) => (
                 <button key={it.id} className={"cal-chip " + it.status} draggable
                   onDragStart={(e) => { e.stopPropagation(); setDragId(it.id); }} onDragEnd={() => setDragId(null)}
-                  onClick={() => setSel(it)} title={it.caption}>
-                  {it.client || STATUS_LABEL[it.status]}
+                  onClick={() => setSel(it)} title={`${STATUS_LABEL[it.status]} · ${it.caption || ""}`}>
+                  <span className="chip-time">{fmtTime(it.scheduled_at)}</span>
+                  <span className="chip-txt">{showClient ? it.client : (it.caption?.slice(0, 30) || STATUS_LABEL[it.status])}</span>
                 </button>
               ))}
               {dayItems.length > 4 && <div className="cal-more">+{dayItems.length - 4}</div>}
