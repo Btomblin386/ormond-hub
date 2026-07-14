@@ -125,24 +125,62 @@ export default function BrandListener({ clientId, sources, mentions, onRepurpose
       ) : (
         <div className="mention-list">
           {mentions.map((m) => (
-            <div key={m.id} className="mention">
-              <span className={"sent " + (m.sentiment || "neutral")} />
-              <div className="mention-body">
-                <div className="mention-top">
-                  {m.url ? <a href={m.url} target="_blank" rel="noreferrer" className="mention-title">{m.title}</a> : <span className="mention-title">{m.title}</span>}
-                  <span className="mention-when">{timeAgo(m.published_at || m.created_at)}</span>
-                </div>
-                {m.snippet && <div className="mention-snip">{m.snippet.slice(0, 200)}</div>}
-                <div className="mention-tags">
-                  {(m.tags || []).map((t) => <span key={t} className="mtag">{t}</span>)}
-                  {m.author && <span className="mention-author">{m.author}</span>}
-                  <button className="mention-repurpose" onClick={() => onRepurpose(`${m.title}. ${m.snippet || ""}`)}>Repurpose →</button>
-                </div>
-              </div>
-            </div>
+            <Mention key={m.id} clientId={clientId} m={m} onRepurpose={onRepurpose} />
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function Mention({ clientId, m, onRepurpose }) {
+  const router = useRouter();
+  const [replying, setReplying] = useState(false);
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState("");
+  const [note, setNote] = useState("");
+
+  const isFb = String(m.mtype || "").startsWith("fb");
+  const canReply = ["fb_tag", "fb_visitor", "fb_mention", "ig_tag", "ig_comment", "ig_mention"].includes(m.mtype);
+
+  async function act(action, message) {
+    setBusy(action);
+    try {
+      const r = await fetch("/api/mention-action", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, mention_id: m.id, message }) });
+      const d = await r.json();
+      if (d.error) setNote(d.error);
+      else { setReplying(false); setText(""); router.refresh(); }
+    } finally { setBusy(""); }
+  }
+
+  return (
+    <div className="mention">
+      <span className={"sent " + (m.sentiment || "neutral")} />
+      {m.media_url && <img className="mention-media" src={m.media_url} alt="" />}
+      <div className="mention-body">
+        <div className="mention-top">
+          {m.url ? <a href={m.url} target="_blank" rel="noreferrer" className="mention-title">{m.title}</a> : <span className="mention-title">{m.title}</span>}
+          <span className="mention-when">{timeAgo(m.published_at || m.created_at)}</span>
+        </div>
+        {m.snippet && <div className="mention-snip">{m.snippet.slice(0, 240)}</div>}
+        <div className="mention-tags">
+          {(m.tags || []).map((t) => <span key={t} className="mtag">{t}</span>)}
+          {m.author && <span className="mention-author">{m.author}</span>}
+          {m.responded && <span className="mtag replied">replied</span>}
+        </div>
+        <div className="mention-actions">
+          {canReply && <button onClick={() => setReplying((r) => !r)}>{replying ? "Cancel" : "Reply"}</button>}
+          {isFb && <button disabled={busy === "like"} onClick={() => act("like")}>{busy === "like" ? "…" : "Like"}</button>}
+          <button className="mention-repurpose" onClick={() => onRepurpose(`${m.title}. ${m.snippet || ""}`)}>Repurpose →</button>
+        </div>
+        {replying && (
+          <div className="mention-reply">
+            <textarea rows={2} value={text} onChange={(e) => setText(e.target.value)} placeholder="Write a reply…" />
+            <button className="push-create" disabled={busy === "reply" || !text.trim()} onClick={() => act("reply", text)}>{busy === "reply" ? "Sending…" : "Send reply"}</button>
+          </div>
+        )}
+        {note && <div className="push-err">{note}</div>}
+      </div>
     </div>
   );
 }
