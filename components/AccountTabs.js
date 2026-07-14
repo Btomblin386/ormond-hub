@@ -1,17 +1,21 @@
 import Link from "next/link";
 
-export default function AccountTabs({ accountId, active, days = 30 }) {
+export default function AccountTabs({ accountId, active, days = 30, role = "agency" }) {
   return (
     <div className="acct-tabs">
-      <Link href={`/accounts/${accountId}?days=${days}`} className={"acct-tab" + (active === "paid" ? " active" : "")}>
-        Paid Marketing
-      </Link>
+      {role === "agency" && (
+        <Link href={`/accounts/${accountId}?days=${days}`} className={"acct-tab" + (active === "paid" ? " active" : "")}>
+          Paid Marketing
+        </Link>
+      )}
       <Link href={`/accounts/${accountId}/content`} className={"acct-tab" + (active === "content" ? " active" : "")}>
         Content
       </Link>
-      <Link href={`/accounts/${accountId}/engage`} className={"acct-tab" + (active === "engage" ? " active" : "")}>
-        Listen &amp; Create
-      </Link>
+      {role !== "client" && (
+        <Link href={`/accounts/${accountId}/engage`} className={"acct-tab" + (active === "engage" ? " active" : "")}>
+          Listen &amp; Create
+        </Link>
+      )}
     </div>
   );
 }

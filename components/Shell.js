@@ -27,10 +27,14 @@ export default function Shell({ crumb, children, wide }) {
   const days = params.get("days") || "30";
   const [accounts, setAccounts] = useState([]);
   const [acctOpen, setAcctOpen] = useState(true);
+  const [role, setRole] = useState("agency");
 
   useEffect(() => {
     fetch("/api/nav").then((r) => r.json()).then((d) => setAccounts(d.accounts || [])).catch(() => {});
+    fetch("/api/me").then((r) => r.json()).then((d) => setRole(d.role || "agency")).catch(() => {});
   }, []);
+  const isAgency = role === "agency";
+  const isClient = role === "client";
 
   const setDays = (d) => {
     const p = new URLSearchParams(Array.from(params.entries()));
@@ -57,19 +61,21 @@ export default function Shell({ crumb, children, wide }) {
             <Link href="/" className="navlink subtle">← Agency Overview</Link>
             <div className="acct-name">{acctName}</div>
 
-            <div className="navgroup">
-              <Link href={`/accounts/${acctId}?days=${days}`} className={"navlink navgroup-title" + (onPaid ? " active" : "")}>
-                Paid Marketing
-              </Link>
-              {onPaid && (
-                <div className="navsub">
-                  {PAID_SECTIONS.map((s) => (
-                    <Link key={s.hash} href={`/accounts/${acctId}?days=${days}#${s.hash}`} className="navsublink">{s.label}</Link>
-                  ))}
-                  <Link href={`/reconciliation?client=${encodeURIComponent(acctName)}&days=${days}`} className="navsublink">Reconciliation</Link>
-                </div>
-              )}
-            </div>
+            {isAgency && (
+              <div className="navgroup">
+                <Link href={`/accounts/${acctId}?days=${days}`} className={"navlink navgroup-title" + (onPaid ? " active" : "")}>
+                  Paid Marketing
+                </Link>
+                {onPaid && (
+                  <div className="navsub">
+                    {PAID_SECTIONS.map((s) => (
+                      <Link key={s.hash} href={`/accounts/${acctId}?days=${days}#${s.hash}`} className="navsublink">{s.label}</Link>
+                    ))}
+                    <Link href={`/reconciliation?client=${encodeURIComponent(acctName)}&days=${days}`} className="navsublink">Reconciliation</Link>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="navgroup">
               <Link href={`/accounts/${acctId}/content`} className={"navlink navgroup-title" + (onContent ? " active" : "")}>
@@ -84,22 +90,24 @@ export default function Shell({ crumb, children, wide }) {
               )}
             </div>
 
-            <div className="navgroup">
-              <Link href={`/accounts/${acctId}/engage`} className={"navlink navgroup-title" + (onEngage ? " active" : "")}>
-                Listen &amp; Create
-              </Link>
-              {onEngage && (
-                <div className="navsub">
-                  {ENGAGE_SECTIONS.map((s) => (
-                    <Link key={s.hash} href={`/accounts/${acctId}/engage#${s.hash}`} className="navsublink">{s.label}</Link>
-                  ))}
-                </div>
-              )}
-            </div>
+            {!isClient && (
+              <div className="navgroup">
+                <Link href={`/accounts/${acctId}/engage`} className={"navlink navgroup-title" + (onEngage ? " active" : "")}>
+                  Listen &amp; Create
+                </Link>
+                {onEngage && (
+                  <div className="navsub">
+                    {ENGAGE_SECTIONS.map((s) => (
+                      <Link key={s.hash} href={`/accounts/${acctId}/engage#${s.hash}`} className="navsublink">{s.label}</Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </nav>
         ) : (
           <nav>
-            <Link href="/" className={"navlink" + (path === "/" ? " active" : "")}>Agency Overview</Link>
+            {isAgency && <Link href="/" className={"navlink" + (path === "/" ? " active" : "")}>Agency Overview</Link>}
             <div className="navgroup">
               <button className={"navlink navgroup-head" + (path.startsWith("/accounts") ? " active" : "")} onClick={() => setAcctOpen((o) => !o)}>
                 <span>Accounts</span>
@@ -114,8 +122,9 @@ export default function Shell({ crumb, children, wide }) {
                 </div>
               )}
             </div>
-            <Link href="/reconciliation" className={"navlink" + (path.startsWith("/reconciliation") ? " active" : "")}>Reconciliation</Link>
-            <Link href="/onboard" className={"navlink" + (path.startsWith("/onboard") ? " active" : "")}>+ Connect accounts</Link>
+            {isAgency && <Link href="/reconciliation" className={"navlink" + (path.startsWith("/reconciliation") ? " active" : "")}>Reconciliation</Link>}
+            {isAgency && <Link href="/onboard" className={"navlink" + (path.startsWith("/onboard") ? " active" : "")}>+ Connect accounts</Link>}
+            {isAgency && <Link href="/team" className={"navlink" + (path.startsWith("/team") ? " active" : "")}>Team &amp; access</Link>}
           </nav>
         )}
 

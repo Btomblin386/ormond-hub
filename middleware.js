@@ -1,21 +1,90 @@
 import { NextResponse } from "next/server";
 
-// Simple single-password gate for the private v1.
-export function middleware(req) {
-  const { pathname } = req.nextUrl;
-  const isAuthPath =
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/api/login") ||
-    pathname.startsWith("/privacy") ||         // public: required for Meta app review
-    pathname.startsWith("/terms") ||           // public: required for Meta app review
-    pathname.startsWith("/data-deletion");     // public: required for Meta app review
-  const authed = req.cookies.get("hub_auth")?.value === process.env.DASHBOARD_PASSWORD;
+const PUBLIC = ["/login", "/api/login", "/privacy", "/terms", "/data-deletion"];
 
-  if (!authed && !isAuthPath) {
+// Paid-marketing APIs that creators/clients may not call
+const PAID_APIS = ["/api/manage", "/api/create", "/api/rules", "/api/account-settings", "/api/campaign-plan", "/api/audiences", "/api/pin", "/api/users"];
+
+function b64urlFromBytes(bytes) {
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function verifyToken(token, secret) {
+  const [body, sig] = (token || "").split(".");
+  if (!body || !sig) return null;
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, enc.encode(body)));
+  if (b64urlFromBytes(mac) !== sig) return null;
+  try {
+    let b = body.replace(/-/g, "+").replace(/_/g, "/");
+    while (b.length % 4) b += "=";
+    const bytes = Uint8Array.from(atob(b), (ch) => ch.charCodeAt(0));
+    const p = JSON.parse(new TextDecoder().decode(bytes));
+    if (p.exp && Date.now() > p.exp) return null;
+    return p;
+  } catch { return null; }
+}
+
+export async function middleware(req) {
+  const { pathname } = req.nextUrl;
+  if (PUBLIC.some((p) => pathname.startsWith(p))) return NextResponse.next();
+
+  const secret = process.env.DASHBOARD_PASSWORD;
+  let session = null;
+  const tok = req.cookies.get("hub_session")?.value;
+  if (tok) session = await verifyToken(tok, secret);
+  if (!session && req.cookies.get("hub_auth")?.value === secret) session = { role: "agency" };
+
+  if (!session) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
+
+  const role = session.role || "agency";
+  const clientId = session.client_id || null;
+
+  if (role === "agency") return NextResponse.next();
+
+  // ---- CLIENT: locked to their own brand's Content only ----
+  if (role === "client") {
+    const home = clientId ? `/accounts/${clientId}/content` : "/login";
+    const okApi = ["/api/content", "/api/content-media", "/api/nav", "/api/me", "/api/logout"];
+    const allowed =
+      (clientId && pathname.startsWith(`/accounts/${clientId}/content`)) ||
+      okApi.some((a) => pathname.startsWith(a));
+    if (!allowed) {
+      const url = req.nextUrl.clone();
+      url.pathname = home; url.search = "";
+      return NextResponse.redirect(url);
+    }
+    return NextResponse.next();
+  }
+
+  // ---- CREATOR: Content + Listen & Create; no paid marketing ----
+  if (role === "creator") {
+    if (PAID_APIS.some((a) => pathname.startsWith(a))) {
+      return new NextResponse(JSON.stringify({ error: "Not permitted for your role" }), { status: 403, headers: { "Content-Type": "application/json" } });
+    }
+    const blockedPage =
+      pathname === "/" ||
+      pathname.startsWith("/reconciliation") ||
+      pathname.startsWith("/onboard") ||
+      /^\/accounts\/[^/]+$/.test(pathname); // paid-marketing account root
+    if (blockedPage) {
+      const url = req.nextUrl.clone();
+      // send them to the content view (of that account if we can tell)
+      const m = pathname.match(/^\/accounts\/([^/]+)$/);
+      url.pathname = m ? `/accounts/${m[1]}/content` : "/accounts";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+    return NextResponse.next();
+  }
+
   return NextResponse.next();
 }
 
