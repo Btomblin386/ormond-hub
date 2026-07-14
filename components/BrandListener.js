@@ -1,0 +1,129 @@
+"use client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+
+function timeAgo(s) {
+  if (!s) return "";
+  const d = (Date.now() - new Date(s).getTime()) / 1000;
+  if (d < 3600) return Math.round(d / 60) + "m ago";
+  if (d < 86400) return Math.round(d / 3600) + "h ago";
+  return Math.round(d / 86400) + "d ago";
+}
+
+export default function BrandListener({ clientId, sources, mentions, onRepurpose }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState("");
+  const [msg, setMsg] = useState("");
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ kind: "rss", label: "", url: "", query: "", provider: "" });
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  function flash(t) { setMsg(t); setTimeout(() => setMsg(""), 6000); }
+
+  async function post(payload) {
+    const r = await fetch("/api/brand-sources", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    return r.json();
+  }
+  async function add() {
+    if (form.kind === "rss" && !form.url) { flash("Add the feed URL."); return; }
+    setBusy("add");
+    try {
+      const d = await post({ op: "add", clientId, ...form });
+      if (d.error) flash("Error: " + d.error);
+      else { setForm({ kind: "rss", label: "", url: "", query: "", provider: "" }); setOpen(false); router.refresh(); }
+    } finally { setBusy(""); }
+  }
+  async function poll() {
+    setBusy("poll"); flash("Checking feeds…");
+    try {
+      const d = await post({ op: "poll", clientId });
+      if (d.error) flash("Error: " + d.error);
+      else { flash("Feeds refreshed."); router.refresh(); }
+    } finally { setBusy(""); }
+  }
+
+  return (
+    <div id="listener" className="panel">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <h2>Brand Listener</h2>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="social-btn" onClick={poll} disabled={busy === "poll"}>{busy === "poll" ? "Checking…" : "Refresh now"}</button>
+          <button className="studio-btn" onClick={() => setOpen((o) => !o)}>{open ? "Cancel" : "+ Add source"}</button>
+        </div>
+      </div>
+      <p className="note">Mentions and tags for this brand, pulled from the sources you add. RSS works today (Google Alerts, Reddit search, YouTube, blogs). A social-listening API can be added once you connect a provider key.</p>
+
+      {msg && <div className="mng-msg">{msg}</div>}
+
+      {open && (
+        <div className="rule-form">
+          <div className="rule-grid">
+            <div>
+              <label>Type</label>
+              <select value={form.kind} onChange={(e) => set("kind", e.target.value)}>
+                <option value="rss">RSS feed</option>
+                <option value="api">Provider API</option>
+              </select>
+            </div>
+            <div>
+              <label>Label</label>
+              <input type="text" value={form.label} onChange={(e) => set("label", e.target.value)} placeholder="Google Alerts – brand" />
+            </div>
+          </div>
+          {form.kind === "rss" ? (
+            <>
+              <label>Feed URL</label>
+              <input type="url" value={form.url} onChange={(e) => set("url", e.target.value)} placeholder="https://www.google.com/alerts/feeds/…" />
+              <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>Tip: create a Google Alert → deliver to “RSS feed” → paste the feed URL here. Reddit: add .rss to a search URL.</div>
+            </>
+          ) : (
+            <>
+              <label>Provider</label>
+              <input type="text" value={form.provider} onChange={(e) => set("provider", e.target.value)} placeholder="brand24 / mention / talkwalker" />
+              <label>Search query</label>
+              <input type="text" value={form.query} onChange={(e) => set("query", e.target.value)} placeholder="brand name, product, @handle" />
+              <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>Needs a provider API key set in the backend to activate.</div>
+            </>
+          )}
+          <button className="push-create" style={{ marginTop: 10 }} onClick={add} disabled={busy === "add"}>{busy === "add" ? "Adding…" : "Add source"}</button>
+        </div>
+      )}
+
+      {sources.length > 0 && (
+        <div className="src-row-wrap">
+          {sources.map((s) => (
+            <div key={s.id} className={"src-chip" + (s.enabled ? "" : " off")}>
+              <span className="src-kind">{s.kind}</span>
+              <span className="src-label">{s.label || s.url || s.query}</span>
+              <button onClick={async () => { setBusy(s.id); await post({ op: "toggle", id: s.id, enabled: !s.enabled }); router.refresh(); setBusy(""); }}>{s.enabled ? "off" : "on"}</button>
+              <button className="rule-del" onClick={async () => { if (!confirm("Remove this source?")) return; setBusy(s.id); await post({ op: "delete", id: s.id }); router.refresh(); setBusy(""); }}>×</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {mentions.length === 0 ? (
+        <div className="muted" style={{ fontSize: 13, marginTop: 10 }}>No mentions yet. Add a source and hit “Refresh now.”</div>
+      ) : (
+        <div className="mention-list">
+          {mentions.map((m) => (
+            <div key={m.id} className="mention">
+              <span className={"sent " + (m.sentiment || "neutral")} />
+              <div className="mention-body">
+                <div className="mention-top">
+                  {m.url ? <a href={m.url} target="_blank" rel="noreferrer" className="mention-title">{m.title}</a> : <span className="mention-title">{m.title}</span>}
+                  <span className="mention-when">{timeAgo(m.published_at || m.created_at)}</span>
+                </div>
+                {m.snippet && <div className="mention-snip">{m.snippet.slice(0, 200)}</div>}
+                <div className="mention-tags">
+                  {(m.tags || []).map((t) => <span key={t} className="mtag">{t}</span>)}
+                  {m.author && <span className="mention-author">{m.author}</span>}
+                  <button className="mention-repurpose" onClick={() => onRepurpose(`${m.title}. ${m.snippet || ""}`)}>Repurpose →</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

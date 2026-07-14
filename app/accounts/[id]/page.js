@@ -9,8 +9,8 @@ import AccountChat from "../../../components/AccountChat";
 import CampaignStudio from "../../../components/CampaignStudio";
 import AdsManager from "../../../components/AdsManager";
 import RulesManager from "../../../components/RulesManager";
-import ContentManager from "../../../components/ContentManager";
-import { accountById, accountTotals, accountTrend, accountCampaigns, clientsWithGa4, insightsForClient, insightsGeneratedAt, storeMonthly, pinnedForClient, campaignPlanForClient, accountCampaignsManaged, adWritesForAccount, rulesForAccount, ruleEventsForAccount, contentForClient, socialForClient } from "../../../lib/db";
+import AccountTabs from "../../../components/AccountTabs";
+import { accountById, accountTotals, accountTrend, accountCampaigns, clientsWithGa4, insightsForClient, insightsGeneratedAt, storeMonthly, pinnedForClient, campaignPlanForClient, accountCampaignsManaged, adWritesForAccount, rulesForAccount, ruleEventsForAccount } from "../../../lib/db";
 import { money, num, roas, roasClass } from "../../../lib/format";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -28,7 +28,7 @@ export default async function AccountDetail({ params, searchParams }) {
   const acct = await accountById(params.id);
   if (!acct) notFound();
 
-  const [totals, trend, campaigns, ga4Clients, insights, insightsAt, store, pinned, campaignPlan, managedCampaigns, adWrites, rules, ruleEvents, contentItems, social] = await Promise.all([
+  const [totals, trend, campaigns, ga4Clients, insights, insightsAt, store, pinned, campaignPlan, managedCampaigns, adWrites, rules, ruleEvents] = await Promise.all([
     accountTotals(params.id, days),
     accountTrend(params.id, days),
     accountCampaigns(params.id, days),
@@ -42,16 +42,12 @@ export default async function AccountDetail({ params, searchParams }) {
     adWritesForAccount(params.id),
     rulesForAccount(params.id),
     ruleEventsForAccount(params.id),
-    contentForClient(acct.client_id),
-    socialForClient(acct.client_id),
   ]);
 
   const pinnedTitles = new Set(pinned.map((p) => p.title));
-
   const r = roas(totals.revenue, totals.spend);
   const ctr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
 
-  // Build year-over-year seasonality overlay (last up to 3 years, complete months only)
   const seasonYears = [...new Set(store.map((s) => String(s.year)))].sort().slice(-3);
   const seasonal = MONTHS.map((m, i) => {
     const row = { month: m };
@@ -63,25 +59,27 @@ export default async function AccountDetail({ params, searchParams }) {
   const hasGa4 = ga4Clients.includes(acct.client);
 
   return (
-    <Shell crumb={<><Link href={`/accounts?days=${days}`}>Accounts</Link> · <b>{acct.client}</b></>}>
-      <Link className="backlink" href={`/accounts?days=${days}`}>← All accounts</Link>
+    <Shell crumb={<><Link href={`/accounts?days=${days}`}>Accounts</Link> · <b>{acct.client}</b> · Paid Marketing</>}>
       <h1>
         {acct.client}{" "}
         <span className={"pill" + (acct.platform === "google" ? " google" : "")}>{acct.platform}</span>
       </h1>
-      <div className="sub">
-        Account {acct.external_account_id} · last {days} days
-        {hasGa4 && (
-          <> · <Link className="rowlink" href={`/reconciliation?client=${encodeURIComponent(acct.client)}&days=${days}`}>View Meta↔GA4 reconciliation →</Link></>
-        )}
-      </div>
+      <div className="sub">Account {acct.external_account_id} · Paid Marketing · last {days} days</div>
 
-      <div className="cards">
+      <AccountTabs accountId={acct.id} active="paid" days={days} />
+
+      <div id="performance" className="cards">
         <div className="card"><div className="label">Spend</div><div className="value">{money(totals.spend)}</div></div>
         <div className="card"><div className="label">Revenue</div><div className="value">{money(totals.revenue)}</div><div className="foot">Meta-reported</div></div>
         <div className="card"><div className="label">ROAS</div><div className={"value " + roasClass(r)}>{r.toFixed(1)}x</div></div>
         <div className="card"><div className="label">Conversions</div><div className="value">{num(Math.round(totals.conversions))}</div><div className="foot">CTR {ctr.toFixed(1)}%</div></div>
       </div>
+
+      {hasGa4 && (
+        <div className="sub" style={{ marginTop: -6 }}>
+          <Link className="rowlink" href={`/reconciliation?client=${encodeURIComponent(acct.client)}&days=${days}`}>View Meta↔GA4 reconciliation →</Link>
+        </div>
+      )}
 
       {pinned.length > 0 && (
         <div className="panel">
@@ -94,14 +92,10 @@ export default async function AccountDetail({ params, searchParams }) {
       )}
 
       {insights.length > 0 && (
-        <div className="panel">
+        <div id="insights" className="panel">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
             <h2>Smart Insights</h2>
-            {insightsAt && (
-              <span className="note" style={{ margin: 0 }}>
-                Updated {new Date(insightsAt).toLocaleDateString()}
-              </span>
-            )}
+            {insightsAt && <span className="note" style={{ margin: 0 }}>Updated {new Date(insightsAt).toLocaleDateString()}</span>}
           </div>
           <p className="note">AI-flagged from monthly sales trends (month-over-month + year-over-year), judged against the business seasonality. Pin any card to track it.</p>
           {GROUPS.map((g) => {
@@ -121,7 +115,9 @@ export default async function AccountDetail({ params, searchParams }) {
         </div>
       )}
 
-      <CampaignStudio client={acct.client} initialPlan={campaignPlan} accountExt={acct.external_account_id} existingCampaigns={managedCampaigns} />
+      <div id="studio">
+        <CampaignStudio client={acct.client} initialPlan={campaignPlan} accountExt={acct.external_account_id} existingCampaigns={managedCampaigns} />
+      </div>
 
       <AccountChat client={acct.client} />
 
@@ -138,7 +134,7 @@ export default async function AccountDetail({ params, searchParams }) {
         <TrendChart data={trend} />
       </div>
 
-      <div className="panel">
+      <div id="campaigns" className="panel">
         <h2>Campaigns</h2>
         <p className="note">Active campaigns in this window, by spend.</p>
         <table>
@@ -167,18 +163,20 @@ export default async function AccountDetail({ params, searchParams }) {
         </table>
       </div>
 
-      <ContentManager clientId={acct.client_id} client={acct.client} items={contentItems} social={social} />
+      <div id="ads">
+        <AdsManager
+          accountId={acct.id}
+          accountExt={acct.external_account_id}
+          cap={acct.max_daily_budget}
+          urlParams={acct.url_params}
+          campaigns={managedCampaigns}
+          writes={adWrites}
+        />
+      </div>
 
-      <AdsManager
-        accountId={acct.id}
-        accountExt={acct.external_account_id}
-        cap={acct.max_daily_budget}
-        urlParams={acct.url_params}
-        campaigns={managedCampaigns}
-        writes={adWrites}
-      />
-
-      <RulesManager accountId={acct.id} rules={rules} events={ruleEvents} />
+      <div id="rules">
+        <RulesManager accountId={acct.id} rules={rules} events={ruleEvents} />
+      </div>
     </Shell>
   );
 }
