@@ -71,7 +71,7 @@ export default function Shell({ crumb, children, wide }) {
                     {PAID_SECTIONS.map((s) => (
                       <Link key={s.hash} href={`/accounts/${acctId}?days=${days}#${s.hash}`} className="navsublink">{s.label}</Link>
                     ))}
-                    <Link href={`/reconciliation?client=${encodeURIComponent(acctName)}&days=${days}`} className="navsublink">Reconciliation</Link>
+                    <Link href={`/accounts/${acctId}/google?days=${days}`} className="navsublink">Google · GA4</Link>
                   </div>
                 )}
               </div>
@@ -122,7 +122,7 @@ export default function Shell({ crumb, children, wide }) {
                 </div>
               )}
             </div>
-            {isAgency && <Link href="/reconciliation" className={"navlink" + (path.startsWith("/reconciliation") ? " active" : "")}>Reconciliation</Link>}
+            {/* Reconciliation moved into each account's Google tab; route kept for deep links */}
             {isAgency && <Link href="/onboard" className={"navlink" + (path.startsWith("/onboard") ? " active" : "")}>+ Connect accounts</Link>}
             {isAgency && <Link href="/team" className={"navlink" + (path.startsWith("/team") ? " active" : "")}>Team &amp; access</Link>}
           </nav>

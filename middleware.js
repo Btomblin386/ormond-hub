@@ -80,7 +80,8 @@ export async function middleware(req) {
       pathname === "/" ||
       pathname.startsWith("/reconciliation") ||
       pathname.startsWith("/onboard") ||
-      /^\/accounts\/[^/]+$/.test(pathname); // paid-marketing account root
+      /^\/accounts\/[^/]+$/.test(pathname) ||        // paid-marketing account root
+      /^\/accounts\/[^/]+\/google/.test(pathname);   // google analytics/ads tab
     if (blockedPage) {
       const url = req.nextUrl.clone();
       // send them to the content view (of that account if we can tell)

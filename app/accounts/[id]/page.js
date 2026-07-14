@@ -80,6 +80,7 @@ export default async function AccountDetail({ params, searchParams }) {
         <div className="panel">
           <h2>No ad account connected</h2>
           <p className="note">This brand is set up for content only. Head to <b>Content Marketing</b> to compose and schedule posts, or connect a Meta ad account to unlock paid performance, Campaign Studio, and rules here.</p>
+          <a className="cmp-btn solid" style={{ display: "inline-block", textDecoration: "none" }} href="/onboard">Connect accounts →</a>
         </div>
       )}
 
@@ -94,7 +95,7 @@ export default async function AccountDetail({ params, searchParams }) {
 
       {hasGa4 && (
         <div className="sub" style={{ marginTop: -6 }}>
-          <Link className="rowlink" href={`/reconciliation?client=${encodeURIComponent(acct.client)}&days=${days}`}>View Meta↔GA4 reconciliation →</Link>
+          <Link className="rowlink" href={`/accounts/${acct.id}/google?days=${days}`}>View Google Analytics &amp; attribution →</Link>
         </div>
       )}
       </>

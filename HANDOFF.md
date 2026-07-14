@@ -91,6 +91,9 @@ FB Login redirect URI to whitelist: `https://<prod-domain>/api/oauth/facebook/ca
 ## Key frontend structure
 - `app/page.js` — Agency Overview (notifications + cross-account content calendar + KPIs). **Slated for redesign.**
 - `app/accounts/[id]/page.js` — Paid Marketing (KPIs, insights, campaign studio, campaigns, ads manager, rules).
+- `app/accounts/[id]/google/page.js` — Google tab (agency-only): GA4 connection status + per-client
+  Meta↔GA4 reconciliation (moved here from the global Reconciliation page, whose route still works for
+  deep links but is out of the nav) + Google Ads placeholder until the developer token is approved.
 - `app/accounts/[id]/content/page.js` — Content (Posts composer + Calendar). `?edit=<id>` opens composer in edit mode.
 - `app/accounts/[id]/engage/page.js` — Listen & Create (Brand Listener + Repurpose Studio).
 - Routing is **client-centric**: route param = client_id; a brand shows if it has an ad account OR a social connection.

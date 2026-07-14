@@ -40,6 +40,9 @@ postgres.js doesn't verify it).
 
 - 3 clients: one ads+rising revenue, one ads+falling revenue, one content-only (social_accounts row,
   no ad_account) — the content-only brand must appear in the Accounts table but not the trend grid.
+- Don't hand-minimize table columns — mirror them from production `information_schema.columns`.
+  Pages join more than you expect (e.g. the Google tab joins ga4_properties → oauth_tokens; ga4_product
+  needs purchases/window_start/window_end). Missing relations 500 the whole page.
 - 30 days of `daily_metrics` per ad account (linear ramps make deltas hand-checkable).
 - content_items: one `needs_approval` undated, one `approved` future-dated, one overdue `draft`.
 - One `insights` row + one `ad_rules`/`rule_events` pair → populates all notification buckets.
