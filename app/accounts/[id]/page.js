@@ -115,7 +115,7 @@ export default async function AccountDetail({ params, searchParams }) {
         </div>
       )}
 
-      <CampaignStudio client={acct.client} initialPlan={campaignPlan} />
+      <CampaignStudio client={acct.client} initialPlan={campaignPlan} accountExt={acct.external_account_id} />
 
       <AccountChat client={acct.client} />
 
