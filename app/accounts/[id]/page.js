@@ -8,7 +8,8 @@ import PinnedItem from "../../../components/PinnedItem";
 import AccountChat from "../../../components/AccountChat";
 import CampaignStudio from "../../../components/CampaignStudio";
 import AdsManager from "../../../components/AdsManager";
-import { accountById, accountTotals, accountTrend, accountCampaigns, clientsWithGa4, insightsForClient, insightsGeneratedAt, storeMonthly, pinnedForClient, campaignPlanForClient, accountCampaignsManaged, adWritesForAccount } from "../../../lib/db";
+import RulesManager from "../../../components/RulesManager";
+import { accountById, accountTotals, accountTrend, accountCampaigns, clientsWithGa4, insightsForClient, insightsGeneratedAt, storeMonthly, pinnedForClient, campaignPlanForClient, accountCampaignsManaged, adWritesForAccount, rulesForAccount, ruleEventsForAccount } from "../../../lib/db";
 import { money, num, roas, roasClass } from "../../../lib/format";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -26,7 +27,7 @@ export default async function AccountDetail({ params, searchParams }) {
   const acct = await accountById(params.id);
   if (!acct) notFound();
 
-  const [totals, trend, campaigns, ga4Clients, insights, insightsAt, store, pinned, campaignPlan, managedCampaigns, adWrites] = await Promise.all([
+  const [totals, trend, campaigns, ga4Clients, insights, insightsAt, store, pinned, campaignPlan, managedCampaigns, adWrites, rules, ruleEvents] = await Promise.all([
     accountTotals(params.id, days),
     accountTrend(params.id, days),
     accountCampaigns(params.id, days),
@@ -38,6 +39,8 @@ export default async function AccountDetail({ params, searchParams }) {
     campaignPlanForClient(acct.client),
     accountCampaignsManaged(params.id, days),
     adWritesForAccount(params.id),
+    rulesForAccount(params.id),
+    ruleEventsForAccount(params.id),
   ]);
 
   const pinnedTitles = new Set(pinned.map((p) => p.title));
@@ -168,6 +171,8 @@ export default async function AccountDetail({ params, searchParams }) {
         campaigns={managedCampaigns}
         writes={adWrites}
       />
+
+      <RulesManager accountId={acct.id} rules={rules} events={ruleEvents} />
     </Shell>
   );
 }
