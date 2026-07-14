@@ -94,6 +94,7 @@ export default function Shell({ crumb, children }) {
               )}
             </div>
             <Link href="/reconciliation" className={"navlink" + (path.startsWith("/reconciliation") ? " active" : "")}>Reconciliation</Link>
+            <Link href="/onboard" className={"navlink" + (path.startsWith("/onboard") ? " active" : "")}>+ Connect accounts</Link>
           </nav>
         )}
 
