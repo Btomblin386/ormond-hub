@@ -1,11 +1,22 @@
 import { NextResponse } from "next/server";
-import { setAccountCap, setAccountUrlParams, renameClient } from "../../../lib/db";
+import { setAccountCap, setAccountUrlParams, renameClient, deleteSocialAccount, deleteGa4Property } from "../../../lib/db";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req) {
   try {
     const body = await req.json();
+
+    // Disconnect a social identity (Page+IG pair) from its client.
+    if (body.disconnectSocialId) {
+      await deleteSocialAccount(body.disconnectSocialId);
+      return NextResponse.json({ ok: true });
+    }
+    // Disconnect the client's GA4 property (data already ingested is kept).
+    if (body.clientId && body.removeGa4) {
+      await deleteGa4Property(body.clientId);
+      return NextResponse.json({ ok: true });
+    }
 
     // Rename a brand (clients.name is the display name across the hub; all
     // data links by client_id, so renaming is safe).

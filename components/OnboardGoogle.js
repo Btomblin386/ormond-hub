@@ -18,12 +18,14 @@ export default function OnboardGoogle({ properties, clients, email }) {
   const upd = (id, k, v) => setSel((s) => ({ ...s, [id]: { ...s[id], [k]: v } }));
 
   async function connect() {
-    const selections = Object.entries(sel).filter(([, v]) => v.on).map(([property_id, v]) => {
+    const on = Object.entries(sel).filter(([, v]) => v.on);
+    if (on.some(([, v]) => !v.clientId)) { setMsg("Assign each selected property to a client (or choose “Create new client”)."); return; }
+    const selections = on.map(([property_id, v]) => {
       const name = properties.find((p) => p.id === property_id)?.name || property_id;
-      return v.clientId ? { property_id, name, client_id: v.clientId } : { property_id, name, new_name: (v.newName || "").trim() };
+      return v.clientId !== "__new" ? { property_id, name, client_id: v.clientId } : { property_id, name, new_name: (v.newName || "").trim() };
     });
     if (!selections.length) { setMsg("Pick at least one property to connect."); return; }
-    if (selections.some((s) => !s.client_id && !s.new_name)) { setMsg("Each selected property needs a client (existing or new name)."); return; }
+    if (selections.some((s) => !s.client_id && !s.new_name)) { setMsg("New clients need a name."); return; }
     setBusy(true); setMsg("");
     try {
       const r = await fetch("/api/oauth/google-connect", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ selections }) });
@@ -65,10 +67,11 @@ export default function OnboardGoogle({ properties, clients, email }) {
             {s.on && (
               <div className="onb-map">
                 <select value={s.clientId || ""} onChange={(e) => upd(p.id, "clientId", e.target.value)}>
-                  <option value="">➕ New client…</option>
+                  <option value="" disabled>Assign to client…</option>
                   {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  <option value="__new">➕ Create new client…</option>
                 </select>
-                {!s.clientId && (
+                {s.clientId === "__new" && (
                   <input type="text" value={s.newName || ""} onChange={(e) => upd(p.id, "newName", e.target.value)} placeholder="New client name" />
                 )}
               </div>

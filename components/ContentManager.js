@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { fileToB64, cropToRatio, uploadImage, imageSize, IG_RATIOS, IG_FEED_MIN, IG_FEED_MAX, videoMeta, validateReel } from "../lib/media";
 
@@ -13,7 +14,7 @@ const TYPES = ["feed", "reel", "story"];
 const CROP_OPTS = [["original", "Original"], ["1:1", "Square 1:1"], ["4:5", "Portrait 4:5"], ["1.91:1", "Landscape 1.91:1"], ["9:16", "Story/Reel 9:16"]];
 
 /* ---------------- Social connection ---------------- */
-function SocialConnect({ clientId, client, social }) {
+function SocialConnect({ clientId, client, socials }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [pages, setPages] = useState(null);
@@ -36,21 +37,29 @@ function SocialConnect({ clientId, client, social }) {
     } finally { setBusy(false); }
   }
   const picker = pages && (
-    !pages.length ? <div className="muted" style={{ fontSize: 12 }}>No Pages available on the token. Make sure the Page is shared to your business.</div> : (
-      <div className="page-picker">
-        {pages.map((p) => <button key={p.id} className="page-opt" disabled={busy} onClick={() => connect(p.id)}>{p.name}{p.ig_username ? ` · @${p.ig_username}` : ""}</button>)}
+    <div className="page-picker">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span className="muted" style={{ fontSize: 11 }}>Pick a Page to connect</span>
+        <button className="cal-x" style={{ fontSize: 16 }} onClick={() => setPages(null)} title="Close">×</button>
       </div>
-    )
+      {!pages.length
+        ? <div className="muted" style={{ fontSize: 12 }}>No Pages available on the token. Make sure the Page is shared to your business.</div>
+        : pages.map((p) => <button key={p.id} className="page-opt" disabled={busy} onClick={() => connect(p.id)}>{p.name}{p.ig_username ? ` · @${p.ig_username}` : ""}</button>)}
+    </div>
   );
 
-  if (social?.fb_page_id) {
+  if (socials.length > 0) {
     return (
       <div className="social-status connected">
         <span className="social-ok">✓ Connected</span>
-        <span>{social.fb_page_name}</span>
-        {social.ig_username ? <span className="social-ig">@{social.ig_username}</span> : <span className="muted" style={{ fontSize: 11 }}>· no IG linked</span>}
-        <button className="social-btn" onClick={discover} disabled={busy}>Change</button>
-        {picker}{msg && <div className="push-err">{msg}</div>}
+        {socials.map((s) => (
+          <span key={s.id} className="ident-chip">
+            {s.fb_page_name}
+            {s.ig_username ? <span className="social-ig"> @{s.ig_username}</span> : null}
+          </span>
+        ))}
+        <Link className="social-btn" href={`/accounts/${clientId}/settings`} style={{ textDecoration: "none" }}>Manage connections</Link>
+        {msg && <div className="push-err">{msg}</div>}
       </div>
     );
   }
@@ -74,25 +83,36 @@ function toLocalInput(iso) {
   return d.toISOString().slice(0, 16);
 }
 
-function Composer({ clientId, social, seedDate, editItem, onDone }) {
+// Selection keys are "<socialId>:<channel>" so one composer can target several
+// connected identities (e.g. two Pages under one client). On save, keys are
+// grouped by identity into one content item per identity.
+function buildOptions(socials) {
+  const out = [];
+  for (const s of socials) {
+    if (s.fb_page_id) out.push({ key: `${s.id}:facebook`, socialId: s.id, ch: "facebook", label: s.fb_page_name || "Facebook Page", handle: "Facebook" });
+    if (s.ig_user_id) out.push({ key: `${s.id}:instagram`, socialId: s.id, ch: "instagram", label: s.ig_username ? "@" + s.ig_username : "Instagram", handle: "Instagram" });
+  }
+  return out;
+}
+
+function Composer({ clientId, socials, seedDate, editItem, onDone }) {
   const router = useRouter();
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
   const [uploading, setUploading] = useState(false);
-  // Which channels are actually connected for this client
-  const accounts = useMemo(() => {
-    const a = [];
-    if (social?.fb_page_id) a.push({ key: "facebook", label: social.fb_page_name || "Facebook Page", handle: "Facebook" });
-    if (social?.ig_user_id) a.push({ key: "instagram", label: social.ig_username ? "@" + social.ig_username : "Instagram", handle: "Instagram" });
-    return a;
-  }, [social]);
-  const [channels, setChannels] = useState(() => {
-    if (editItem?.channels?.length) return editItem.channels;
-    const all = [];
-    if (social?.fb_page_id) all.push("facebook");
-    if (social?.ig_user_id) all.push("instagram");
-    return all; // default: all connected channels selected
+  const options = useMemo(() => buildOptions(socials), [socials]);
+
+  const [selKeys, setSelKeys] = useState(() => {
+    if (editItem) {
+      const sid = editItem.social_account_id || socials[0]?.id;
+      return (editItem.channels || []).map((ch) => `${sid}:${ch}`).filter((k) => options.some((o) => o.key === k));
+    }
+    // default: every channel of the primary identity
+    const primary = socials[0]?.id;
+    return options.filter((o) => o.socialId === primary).map((o) => o.key);
   });
+  const selChans = useMemo(() => [...new Set(selKeys.map((k) => k.split(":")[1]))], [selKeys]);
+
   const [customize, setCustomize] = useState(() => !!(editItem?.variants && Object.keys(editItem.variants).length));
   const [caption, setCaption] = useState(editItem?.caption || "");
   const [variants, setVariants] = useState(() => ({
@@ -105,30 +125,30 @@ function Composer({ clientId, social, seedDate, editItem, onDone }) {
   const [videoUrl, setVideoUrl] = useState("");
   const [firstComment, setFirstComment] = useState(editItem?.first_comment || "");
   const [scheduledAt, setScheduledAt] = useState(seedDate || (editItem?.scheduled_at ? toLocalInput(editItem.scheduled_at) : nowPlus30()));
-  const [activeTab, setActiveTab] = useState(channels[0] || "facebook");
+  const [activeTab, setActiveTab] = useState(selChans[0] || "facebook");
   const [cropRatio, setCropRatio] = useState("original");
   const [progress, setProgress] = useState({});
   const [igWarn, setIgWarn] = useState("");
   const [videoWarn, setVideoWarn] = useState("");
 
   function flash(t) { setMsg(t); setTimeout(() => setMsg(""), 7000); }
-  function toggleChannel(c) {
-    setChannels((cs) => cs.includes(c) ? cs.filter((x) => x !== c) : [...cs, c]);
-    if (!channels.includes(c)) setActiveTab(c);
+  function toggleKey(k) {
+    setSelKeys((ks) => ks.includes(k) ? ks.filter((x) => x !== k) : [...ks, k]);
+    const ch = k.split(":")[1];
+    if (!selKeys.includes(k)) setActiveTab(ch);
   }
   const setVar = (ch, k, v) => setVariants((s) => ({ ...s, [ch]: { ...s[ch], [k]: v } }));
 
-  // effective {caption, type} per selected channel
-  const plan = useMemo(() => channels.map((ch) => ({
+  // effective {caption, type} per selected channel type
+  const plan = useMemo(() => selChans.map((ch) => ({
     ch,
     caption: customize ? (variants[ch]?.caption || "") : caption,
     type: customize ? (variants[ch]?.post_type || "feed") : baseType,
-  })), [channels, customize, variants, caption, baseType]);
+  })), [selChans, customize, variants, caption, baseType]);
 
   const usesVideo = plan.some((p) => p.type === "reel");
   const usesImage = plan.some((p) => p.type === "feed" || p.type === "story");
 
-  // Validate reel video specs (best-effort; cross-origin may block metadata)
   useEffect(() => {
     if (!usesVideo || !videoUrl.trim()) { setVideoWarn(""); return; }
     let cancel = false;
@@ -143,7 +163,7 @@ function Composer({ clientId, social, seedDate, editItem, onDone }) {
       for (const f of files) {
         let b64 = await fileToB64(f);
         if (cropRatio !== "original") b64 = await cropToRatio(b64, IG_RATIOS[cropRatio]);
-        if (channels.includes("instagram") && baseType === "feed") {
+        if (selChans.includes("instagram") && baseType === "feed") {
           try {
             const s = await imageSize(b64);
             if (s.ratio < IG_FEED_MIN - 0.02 || s.ratio > IG_FEED_MAX + 0.02) setIgWarn("This image's shape is outside Instagram feed limits (portrait 4:5 to landscape 1.91:1). Pick a crop above so it isn't rejected.");
@@ -158,7 +178,7 @@ function Composer({ clientId, social, seedDate, editItem, onDone }) {
   }
 
   function validate() {
-    if (!channels.length) return "Pick at least one channel.";
+    if (!selKeys.length) return "Pick at least one account.";
     if (usesVideo && usesImage) return "Mixing Reel (video) with Feed/Story (image) in one post isn't supported — make separate posts.";
     for (const p of plan) {
       if (p.caption.length > LIMITS[p.ch]) return `${CHAN_LABEL[p.ch]} caption is over the ${LIMITS[p.ch].toLocaleString()}-character limit.`;
@@ -181,43 +201,56 @@ function Composer({ clientId, social, seedDate, editItem, onDone }) {
     setBusy(status);
     const mediaUrls = usesVideo ? [videoUrl.trim()] : media;
     const payloadVariants = customize
-      ? Object.fromEntries(channels.map((ch) => [ch, { caption: variants[ch]?.caption || "", post_type: variants[ch]?.post_type || "feed" }]))
+      ? Object.fromEntries(selChans.map((ch) => [ch, { caption: variants[ch]?.caption || "", post_type: variants[ch]?.post_type || "feed" }]))
       : {};
-    const fields = {
-      clientId, channels, caption, link: link || null, mediaUrls,
+    const shared = {
+      clientId, caption, link: link || null, mediaUrls,
       postType: baseType, variants: payloadVariants, firstComment: firstComment || null,
       scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null,
     };
+    // one content item per selected identity
+    const groups = [];
+    for (const k of selKeys) {
+      const [sid, ch] = k.split(":");
+      let g = groups.find((x) => x.socialAccountId === sid);
+      if (!g) { g = { socialAccountId: sid, channels: [] }; groups.push(g); }
+      if (!g.channels.includes(ch)) g.channels.push(ch);
+    }
     const label = status === "draft" ? "Saved as draft." : status === "needs_approval" ? "Submitted for approval." : "Approved & scheduled.";
     try {
-      let d;
-      if (editItem) {
-        const r1 = await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "update", id: editItem.id, ...fields }) });
-        d = await r1.json();
-        if (!d.error) {
-          const r2 = await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "status", id: editItem.id, status, approvedBy: "agency" }) });
-          d = await r2.json();
+      let firstErr = null;
+      for (let i = 0; i < groups.length; i++) {
+        const g = groups[i];
+        let d;
+        if (editItem && i === 0) {
+          const r1 = await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "update", id: editItem.id, ...shared, channels: g.channels, socialAccountId: g.socialAccountId }) });
+          d = await r1.json();
+          if (!d.error) {
+            const r2 = await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "status", id: editItem.id, status, approvedBy: "agency" }) });
+            d = await r2.json();
+          }
+        } else {
+          const r = await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "create", ...shared, channels: g.channels, socialAccountId: g.socialAccountId, status }) });
+          d = await r.json();
         }
-      } else {
-        const r = await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "create", ...fields, status }) });
-        d = await r.json();
+        if (d.error && !firstErr) firstErr = d.error;
       }
-      if (d.error) flash("Error: " + d.error);
-      else { onDone(label); router.refresh(); }
+      if (firstErr) flash("Error: " + firstErr);
+      else { onDone(groups.length > 1 ? `${label} (${groups.length} accounts)` : label); router.refresh(); }
     } finally { setBusy(""); }
   }
 
-  const igActive = channels.includes("instagram");
+  const igActive = selChans.includes("instagram");
 
   return (
     <div className="composer">
       <div className="cmp-row">
         <div className="cmp-field" style={{ flex: 1, minWidth: 260 }}>
           <label>Post to</label>
-          <AccountSelect accounts={accounts} channels={channels} onToggle={toggleChannel}
-            onAll={() => setChannels(accounts.map((a) => a.key))} onClear={() => setChannels([])} />
+          <AccountSelect options={options} selKeys={selKeys} onToggle={toggleKey}
+            onAll={() => setSelKeys(options.map((o) => o.key))} onClear={() => setSelKeys([])} />
         </div>
-        {channels.length > 1 && (
+        {selChans.length > 1 && (
           <label className="cmp-toggle">
             <input type="checkbox" checked={customize} onChange={(e) => setCustomize(e.target.checked)} /> Customize per channel
           </label>
@@ -229,28 +262,28 @@ function Composer({ clientId, social, seedDate, editItem, onDone }) {
           <div className="cmp-field">
             <div className="cmp-label-row">
               <label>Caption</label>
-              <CharCount value={caption} channels={channels} />
+              <CharCount value={caption} channels={selChans} />
             </div>
             <textarea rows={5} value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Write the post…" />
           </div>
           <div className="cmp-field">
             <label>Post type</label>
-            <TypePicker value={baseType} onChange={setBaseType} igOnly={false} />
+            <TypePicker value={baseType} onChange={setBaseType} />
           </div>
         </>
       ) : (
         <div className="cmp-field">
           <div className="cmp-tabs">
-            {channels.map((ch) => <button key={ch} type="button" className={"cmp-tab" + (activeTab === ch ? " active" : "")} onClick={() => setActiveTab(ch)}>{CHAN_LABEL[ch]}</button>)}
+            {selChans.map((ch) => <button key={ch} type="button" className={"cmp-tab" + (activeTab === ch ? " active" : "")} onClick={() => setActiveTab(ch)}>{CHAN_LABEL[ch]}</button>)}
           </div>
-          {channels.filter((ch) => ch === activeTab).map((ch) => (
+          {selChans.filter((ch) => ch === activeTab).map((ch) => (
             <div key={ch}>
               <div className="cmp-label-row">
                 <label>{CHAN_LABEL[ch]} caption</label>
                 <span className={"charcount" + ((variants[ch]?.caption || "").length > LIMITS[ch] ? " over" : "")}>{(variants[ch]?.caption || "").length}/{LIMITS[ch].toLocaleString()}</span>
               </div>
               <textarea rows={5} value={variants[ch]?.caption || ""} onChange={(e) => setVar(ch, "caption", e.target.value)} placeholder={ch === "instagram" ? "IG caption — @mentions, #hashtags…" : "Facebook caption…"} />
-              <div style={{ marginTop: 8 }}><label>Post type</label><TypePicker value={variants[ch]?.post_type || "feed"} onChange={(v) => setVar(ch, "post_type", v)} igOnly={ch === "instagram"} /></div>
+              <div style={{ marginTop: 8 }}><label>Post type</label><TypePicker value={variants[ch]?.post_type || "feed"} onChange={(v) => setVar(ch, "post_type", v)} /></div>
             </div>
           ))}
         </div>
@@ -292,7 +325,7 @@ function Composer({ clientId, social, seedDate, editItem, onDone }) {
         </div>
       )}
 
-      {channels.includes("facebook") && (
+      {selChans.includes("facebook") && (
         <div className="cmp-field">
           <label>Link <span className="muted">(Facebook feed only)</span></label>
           <input type="url" value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://…" />
@@ -320,18 +353,18 @@ function Composer({ clientId, social, seedDate, editItem, onDone }) {
   );
 }
 
-function AccountSelect({ accounts, channels, onToggle, onAll, onClear }) {
+function AccountSelect({ options, selKeys, onToggle, onAll, onClear }) {
   const [open, setOpen] = useState(false);
-  const selected = accounts.filter((a) => channels.includes(a.key));
+  const selected = options.filter((o) => selKeys.includes(o.key));
   return (
     <div className="acctsel">
       <button type="button" className="acctsel-control" onClick={() => setOpen((o) => !o)}>
         {selected.length === 0 ? <span className="acctsel-ph">Select an account</span> : (
           <span className="acctsel-chips">
-            {selected.map((a) => (
-              <span key={a.key} className={"acctsel-chip " + a.key}>
-                {a.label}
-                <span className="acctsel-x" onClick={(e) => { e.stopPropagation(); onToggle(a.key); }}>×</span>
+            {selected.map((o) => (
+              <span key={o.key} className={"acctsel-chip " + o.ch}>
+                {o.label}
+                <span className="acctsel-x" onClick={(e) => { e.stopPropagation(); onToggle(o.key); }}>×</span>
               </span>
             ))}
           </span>
@@ -344,13 +377,13 @@ function AccountSelect({ accounts, channels, onToggle, onAll, onClear }) {
             <button type="button" onClick={onAll}>Select all</button>
             <button type="button" onClick={onClear}>Clear</button>
           </div>
-          {accounts.length === 0 && <div className="muted" style={{ fontSize: 12, padding: "6px 10px" }}>No accounts connected yet.</div>}
-          {accounts.map((a) => (
-            <label key={a.key} className="acctsel-opt">
-              <input type="checkbox" checked={channels.includes(a.key)} onChange={() => onToggle(a.key)} />
-              <span className={"acctsel-dot " + a.key} />
-              <span className="acctsel-lbl">{a.label}</span>
-              <span className="acctsel-plat">{a.handle}</span>
+          {options.length === 0 && <div className="muted" style={{ fontSize: 12, padding: "6px 10px" }}>No accounts connected yet.</div>}
+          {options.map((o) => (
+            <label key={o.key} className="acctsel-opt">
+              <input type="checkbox" checked={selKeys.includes(o.key)} onChange={() => onToggle(o.key)} />
+              <span className={"acctsel-dot " + o.ch} />
+              <span className="acctsel-lbl">{o.label}</span>
+              <span className="acctsel-plat">{o.handle}</span>
             </label>
           ))}
           <div className="acctsel-soon">TikTok — coming soon</div>
@@ -376,7 +409,7 @@ function TypePicker({ value, onChange }) {
 }
 
 /* ---------------- Main ---------------- */
-export default function ContentManager({ clientId, client, items, social, open: openProp, setOpen: setOpenProp, seedDate, editId }) {
+export default function ContentManager({ clientId, client, items, socials, open: openProp, setOpen: setOpenProp, seedDate, editId }) {
   const router = useRouter();
   const [openLocal, setOpenLocal] = useState(false);
   const open = openProp !== undefined ? openProp : openLocal;
@@ -384,6 +417,7 @@ export default function ContentManager({ clientId, client, items, social, open: 
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
   const [editItem, setEditItem] = useState(null);
+  const multiIdent = socials.length > 1;
   function flash(t) { setMsg(t); setTimeout(() => setMsg(""), 6000); }
 
   function startEdit(it) {
@@ -433,13 +467,13 @@ export default function ContentManager({ clientId, client, items, social, open: 
       </div>
       <p className="note">Compose, schedule, and approve social posts for {client}. Approved posts publish automatically at their scheduled time.</p>
 
-      <SocialConnect clientId={clientId} client={client} social={social} />
+      <SocialConnect clientId={clientId} client={client} socials={socials} />
       {msg && <div className="mng-msg">{msg}</div>}
 
       {open && (
         <>
           {editItem && <div className="cmp-editing">Editing an existing {STATUS_LABEL[editItem.status]?.toLowerCase()} post</div>}
-          <Composer key={editItem?.id || "new"} clientId={clientId} social={social} seedDate={seedDate} editItem={editItem} onDone={(m) => { flash(m); setOpen(false); setEditItem(null); }} />
+          <Composer key={editItem?.id || "new"} clientId={clientId} socials={socials} seedDate={seedDate} editItem={editItem} onDone={(m) => { flash(m); setOpen(false); setEditItem(null); }} />
         </>
       )}
 
@@ -453,6 +487,7 @@ export default function ContentManager({ clientId, client, items, social, open: 
               <div className="content-main">
                 <div className="content-top">
                   <span className={"cbadge " + it.status}>{STATUS_LABEL[it.status]}</span>
+                  {multiIdent && it.identity_name && <span className="content-ident">{it.identity_name}</span>}
                   <span className="content-chan">{(it.channels || []).join(" + ")}</span>
                   {it.post_type && it.post_type !== "feed" && <span className="content-type">{it.post_type}</span>}
                   <span className="content-when">{it.scheduled_at ? new Date(it.scheduled_at).toLocaleString() : it.published_at ? "Published " + new Date(it.published_at).toLocaleDateString() : "no date"}</span>

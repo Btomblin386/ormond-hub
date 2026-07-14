@@ -116,6 +116,18 @@ Also requested (not yet scheduled):
 - Push/email alerts for approvals + missed schedules (currently in-app notifications only).
 - Full top-nav conversion (OneUp-style) — layout is widened but nav still left-rail.
 
+## Recently shipped (2026-07-14, multi-identity + settings)
+- **Multiple Pages per brand** — social_accounts is now one-to-many per client (e.g. Bent Rim Grill +
+  Frio Canyon Motorcycle Stop). Composer "Post to" lists every identity's FB/IG as separate options;
+  saving groups selections into one content_item per identity (`content_items.social_account_id`,
+  FK `on delete set null`); publisher (content-publish v7 logic) posts via the item's own identity with
+  fallback to the client's first. Content list shows an identity badge when a brand has >1.
+- **Account Settings tab** (agency-only) — rename brand, business_desc, social identities list with
+  disconnect, GA4 connect/disconnect, Meta ad account + budget-cap edit. Connect buttons → /onboard.
+- **Onboarding UX** — client dropdown now "Assign to client… / ➕ Create new client…" (was a confusing
+  "New client…" default); page-picker in the composer got a close button.
+- **Data fixes (prod)**: merged duplicate "EPM Performance" clients (GA4 + ads now one client).
+
 ## Recently shipped (2026-07-14, Google OAuth)
 - **Google OAuth onboarding** — /onboard now has "Continue with Google": OAuth (offline, consent) →
   oauth-google edge fn stores refresh token → pick GA4 properties → ga4_properties rows with

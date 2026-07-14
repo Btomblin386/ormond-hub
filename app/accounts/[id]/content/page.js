@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Shell from "../../../../components/Shell";
 import AccountTabs from "../../../../components/AccountTabs";
 import ContentBoard from "../../../../components/ContentBoard";
-import { accountById, contentForClient, socialForClient } from "../../../../lib/db";
+import { accountById, contentForClient, socialsForClient } from "../../../../lib/db";
 import { getSession } from "../../../../lib/session";
 
 export const dynamic = "force-dynamic";
@@ -13,9 +13,9 @@ export default async function AccountContent({ params, searchParams }) {
   if (!acct) notFound();
   const role = getSession()?.role || "agency";
 
-  const [items, social] = await Promise.all([
+  const [items, socials] = await Promise.all([
     contentForClient(acct.client_id),
-    socialForClient(acct.client_id),
+    socialsForClient(acct.client_id),
   ]);
 
   return (
@@ -25,7 +25,7 @@ export default async function AccountContent({ params, searchParams }) {
 
       <AccountTabs accountId={acct.id} active="content" role={role} />
 
-      <ContentBoard clientId={acct.client_id} client={acct.client} items={items} social={social} editId={searchParams?.edit || null} />
+      <ContentBoard clientId={acct.client_id} client={acct.client} items={items} socials={socials} editId={searchParams?.edit || null} />
     </Shell>
   );
 }

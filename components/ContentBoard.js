@@ -3,7 +3,7 @@ import { useState } from "react";
 import ContentManager from "./ContentManager";
 import ContentCalendar from "./ContentCalendar";
 
-export default function ContentBoard({ clientId, client, items, social, editId }) {
+export default function ContentBoard({ clientId, client, items, socials, editId }) {
   const [composerOpen, setComposerOpen] = useState(false);
   const [seedDate, setSeedDate] = useState("");
   const calItems = items.map((it) => ({ ...it, client }));
@@ -17,7 +17,7 @@ export default function ContentBoard({ clientId, client, items, social, editId }
   return (
     <>
       <div id="posts">
-        <ContentManager clientId={clientId} client={client} items={items} social={social}
+        <ContentManager clientId={clientId} client={client} items={items} socials={socials}
           open={composerOpen} setOpen={setComposerOpen} seedDate={seedDate} editId={editId} />
       </div>
 

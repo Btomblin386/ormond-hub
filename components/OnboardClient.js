@@ -18,11 +18,13 @@ export default function OnboardClient({ pages, clients }) {
   const upd = (id, k, v) => setSel((s) => ({ ...s, [id]: { ...s[id], [k]: v } }));
 
   async function connect() {
-    const selections = Object.entries(sel).filter(([, v]) => v.on).map(([page_id, v]) => (
-      v.clientId ? { page_id, client_id: v.clientId } : { page_id, new_name: (v.newName || "").trim() }
+    const on = Object.entries(sel).filter(([, v]) => v.on);
+    if (on.some(([, v]) => !v.clientId)) { setMsg("Assign each selected Page to a client (or choose “Create new client”)."); return; }
+    const selections = on.map(([page_id, v]) => (
+      v.clientId !== "__new" ? { page_id, client_id: v.clientId } : { page_id, new_name: (v.newName || "").trim() }
     ));
     if (!selections.length) { setMsg("Pick at least one Page to connect."); return; }
-    if (selections.some((s) => !s.client_id && !s.new_name)) { setMsg("Each selected Page needs a client (existing or new name)."); return; }
+    if (selections.some((s) => !s.client_id && !s.new_name)) { setMsg("New clients need a name."); return; }
     setBusy(true); setMsg("");
     try {
       const r = await fetch("/api/oauth/connect", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ selections }) });
@@ -65,10 +67,11 @@ export default function OnboardClient({ pages, clients }) {
             {s.on && (
               <div className="onb-map">
                 <select value={s.clientId || ""} onChange={(e) => upd(p.id, "clientId", e.target.value)}>
-                  <option value="">➕ New client…</option>
+                  <option value="" disabled>Assign to client…</option>
                   {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  <option value="__new">➕ Create new client…</option>
                 </select>
-                {!s.clientId && (
+                {s.clientId === "__new" && (
                   <input type="text" value={s.newName || ""} onChange={(e) => upd(p.id, "newName", e.target.value)} placeholder="New client name" />
                 )}
               </div>
