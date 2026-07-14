@@ -27,22 +27,30 @@ export default async function AccountDetail({ params, searchParams }) {
   const days = Number(searchParams?.days) || 30;
   const acct = await accountById(params.id);
   if (!acct) notFound();
+  const adId = acct.ad_account_id;
 
-  const [totals, trend, campaigns, ga4Clients, insights, insightsAt, store, pinned, campaignPlan, managedCampaigns, adWrites, rules, ruleEvents] = await Promise.all([
-    accountTotals(params.id, days),
-    accountTrend(params.id, days),
-    accountCampaigns(params.id, days),
+  const [ga4Clients, insights, insightsAt, store, pinned, campaignPlan] = await Promise.all([
     clientsWithGa4(),
     insightsForClient(acct.client),
     insightsGeneratedAt(acct.client),
     storeMonthly(acct.client),
     pinnedForClient(acct.client),
     campaignPlanForClient(acct.client),
-    accountCampaignsManaged(params.id, days),
-    adWritesForAccount(params.id),
-    rulesForAccount(params.id),
-    ruleEventsForAccount(params.id),
   ]);
+
+  let totals = { spend: 0, revenue: 0, conversions: 0, clicks: 0, impressions: 0 };
+  let trend = [], campaigns = [], managedCampaigns = [], adWrites = [], rules = [], ruleEvents = [];
+  if (adId) {
+    [totals, trend, campaigns, managedCampaigns, adWrites, rules, ruleEvents] = await Promise.all([
+      accountTotals(adId, days),
+      accountTrend(adId, days),
+      accountCampaigns(adId, days),
+      accountCampaignsManaged(adId, days),
+      adWritesForAccount(adId),
+      rulesForAccount(adId),
+      ruleEventsForAccount(adId),
+    ]);
+  }
 
   const pinnedTitles = new Set(pinned.map((p) => p.title));
   const r = roas(totals.revenue, totals.spend);
@@ -62,12 +70,21 @@ export default async function AccountDetail({ params, searchParams }) {
     <Shell crumb={<><Link href={`/accounts?days=${days}`}>Accounts</Link> · <b>{acct.client}</b> · Paid Marketing</>}>
       <h1>
         {acct.client}{" "}
-        <span className={"pill" + (acct.platform === "google" ? " google" : "")}>{acct.platform}</span>
+        {acct.platform && <span className={"pill" + (acct.platform === "google" ? " google" : "")}>{acct.platform}</span>}
       </h1>
-      <div className="sub">Account {acct.external_account_id} · Paid Marketing · last {days} days</div>
+      <div className="sub">{adId ? `Account ${acct.external_account_id} · ` : ""}Paid Marketing · last {days} days</div>
 
       <AccountTabs accountId={acct.id} active="paid" days={days} />
 
+      {!adId && (
+        <div className="panel">
+          <h2>No ad account connected</h2>
+          <p className="note">This brand is set up for content only. Head to <b>Content Marketing</b> to compose and schedule posts, or connect a Meta ad account to unlock paid performance, Campaign Studio, and rules here.</p>
+        </div>
+      )}
+
+      {adId && (
+      <>
       <div id="performance" className="cards">
         <div className="card"><div className="label">Spend</div><div className="value">{money(totals.spend)}</div></div>
         <div className="card"><div className="label">Revenue</div><div className="value">{money(totals.revenue)}</div><div className="foot">Meta-reported</div></div>
@@ -79,6 +96,8 @@ export default async function AccountDetail({ params, searchParams }) {
         <div className="sub" style={{ marginTop: -6 }}>
           <Link className="rowlink" href={`/reconciliation?client=${encodeURIComponent(acct.client)}&days=${days}`}>View Meta↔GA4 reconciliation →</Link>
         </div>
+      )}
+      </>
       )}
 
       {pinned.length > 0 && (
@@ -115,9 +134,11 @@ export default async function AccountDetail({ params, searchParams }) {
         </div>
       )}
 
-      <div id="studio">
-        <CampaignStudio client={acct.client} initialPlan={campaignPlan} accountExt={acct.external_account_id} existingCampaigns={managedCampaigns} />
-      </div>
+      {adId && (
+        <div id="studio">
+          <CampaignStudio client={acct.client} initialPlan={campaignPlan} accountExt={acct.external_account_id} existingCampaigns={managedCampaigns} />
+        </div>
+      )}
 
       <AccountChat client={acct.client} />
 
@@ -129,6 +150,8 @@ export default async function AccountDetail({ params, searchParams }) {
         </div>
       )}
 
+      {adId && (
+      <>
       <div className="panel">
         <h2>Daily spend vs. revenue</h2>
         <TrendChart data={trend} />
@@ -165,7 +188,7 @@ export default async function AccountDetail({ params, searchParams }) {
 
       <div id="ads">
         <AdsManager
-          accountId={acct.id}
+          accountId={acct.ad_account_id}
           accountExt={acct.external_account_id}
           cap={acct.max_daily_budget}
           urlParams={acct.url_params}
@@ -175,8 +198,10 @@ export default async function AccountDetail({ params, searchParams }) {
       </div>
 
       <div id="rules">
-        <RulesManager accountId={acct.id} rules={rules} events={ruleEvents} />
+        <RulesManager accountId={acct.ad_account_id} rules={rules} events={ruleEvents} />
       </div>
+      </>
+      )}
     </Shell>
   );
 }

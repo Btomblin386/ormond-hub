@@ -11,7 +11,9 @@ export default function AccountRow({ account, days }) {
     <tr className="clickable" onClick={go}>
       <td>
         <span className="rowlink">{account.client}</span>{" "}
-        <span className={"pill" + (account.platform === "google" ? " google" : "")}>{account.platform}</span>
+        {account.platform
+          ? <span className={"pill" + (account.platform === "google" ? " google" : "")}>{account.platform}</span>
+          : <span className="pill content">content</span>}
       </td>
       <td>{money(account.spend)}</td>
       <td>{money(account.revenue)}</td>
