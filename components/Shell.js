@@ -14,6 +14,8 @@ const PAID_SECTIONS = [
 const CONTENT_SECTIONS = [
   { hash: "posts", label: "Posts" },
   { hash: "calendar", label: "Calendar" },
+];
+const ENGAGE_SECTIONS = [
   { hash: "listener", label: "Brand Listener" },
   { hash: "repurpose", label: "Repurpose Studio" },
 ];
@@ -41,6 +43,8 @@ export default function Shell({ crumb, children }) {
   const inAccount = parts[1] === "accounts" && parts[2];
   const acctId = inAccount ? parts[2] : null;
   const onContent = inAccount && parts[3] === "content";
+  const onEngage = inAccount && parts[3] === "engage";
+  const onPaid = inAccount && !parts[3];
   const acctName = accounts.find((a) => a.id === acctId)?.client || "Account";
 
   return (
@@ -54,26 +58,43 @@ export default function Shell({ crumb, children }) {
             <div className="acct-name">{acctName}</div>
 
             <div className="navgroup">
-              <Link href={`/accounts/${acctId}?days=${days}`} className={"navlink navgroup-title" + (!onContent ? " active" : "")}>
+              <Link href={`/accounts/${acctId}?days=${days}`} className={"navlink navgroup-title" + (onPaid ? " active" : "")}>
                 Paid Marketing
               </Link>
-              <div className="navsub">
-                {PAID_SECTIONS.map((s) => (
-                  <Link key={s.hash} href={`/accounts/${acctId}?days=${days}#${s.hash}`} className="navsublink">{s.label}</Link>
-                ))}
-                <Link href={`/reconciliation?client=${encodeURIComponent(acctName)}&days=${days}`} className="navsublink">Reconciliation</Link>
-              </div>
+              {onPaid && (
+                <div className="navsub">
+                  {PAID_SECTIONS.map((s) => (
+                    <Link key={s.hash} href={`/accounts/${acctId}?days=${days}#${s.hash}`} className="navsublink">{s.label}</Link>
+                  ))}
+                  <Link href={`/reconciliation?client=${encodeURIComponent(acctName)}&days=${days}`} className="navsublink">Reconciliation</Link>
+                </div>
+              )}
             </div>
 
             <div className="navgroup">
               <Link href={`/accounts/${acctId}/content`} className={"navlink navgroup-title" + (onContent ? " active" : "")}>
-                Content Marketing
+                Content
               </Link>
-              <div className="navsub">
-                {CONTENT_SECTIONS.map((s) => (
-                  <Link key={s.hash} href={`/accounts/${acctId}/content#${s.hash}`} className="navsublink">{s.label}</Link>
-                ))}
-              </div>
+              {onContent && (
+                <div className="navsub">
+                  {CONTENT_SECTIONS.map((s) => (
+                    <Link key={s.hash} href={`/accounts/${acctId}/content#${s.hash}`} className="navsublink">{s.label}</Link>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="navgroup">
+              <Link href={`/accounts/${acctId}/engage`} className={"navlink navgroup-title" + (onEngage ? " active" : "")}>
+                Listen &amp; Create
+              </Link>
+              {onEngage && (
+                <div className="navsub">
+                  {ENGAGE_SECTIONS.map((s) => (
+                    <Link key={s.hash} href={`/accounts/${acctId}/engage#${s.hash}`} className="navsublink">{s.label}</Link>
+                  ))}
+                </div>
+              )}
             </div>
           </nav>
         ) : (

@@ -64,11 +64,12 @@ export default function ContentCalendar({ items, onCreateOnDate }) {
         <div className="cal-unsched">
           <div className="studio-h">Needs attention · no date set</div>
           {unscheduled.map((it) => (
-            <div key={it.id} className="cal-un-row" draggable onDragStart={() => setDragId(it.id)} onDragEnd={() => setDragId(null)}>
+            <div key={it.id} className={"cal-un-row" + (it.status === "needs_approval" ? " urgent" : "")} draggable
+              onDragStart={() => setDragId(it.id)} onDragEnd={() => setDragId(null)} onClick={() => setSel(it)} style={{ cursor: "pointer" }}>
               <span className={"cbadge " + it.status}>{STATUS_LABEL[it.status]}</span>
               <span className="cal-un-client">{it.client}</span>
               <span className="cal-un-cap">{it.caption?.slice(0, 80) || "(no caption)"}</span>
-              {it.status === "needs_approval" && <button className="cal-approve" disabled={busy === it.id + "approved"} onClick={() => act(it.id, "approved")}>Approve</button>}
+              {(it.status === "needs_approval" || it.status === "draft") && <button className="cal-approve" disabled={busy === it.id + "approved"} onClick={(e) => { e.stopPropagation(); act(it.id, "approved"); }}>Approve</button>}
             </div>
           ))}
           <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>Tip: drag any post onto a day to schedule it. {onCreateOnDate ? "Right-click a day to create a new post." : ""}</div>
@@ -130,8 +131,12 @@ export default function ContentCalendar({ items, onCreateOnDate }) {
             <div className="cal-modal-cap">{sel.caption || "(no caption)"}</div>
             {sel.error && <div className="push-err">{sel.error}</div>}
             <div className="cal-modal-actions">
-              {sel.status === "needs_approval" && <button className="cal-approve" onClick={() => act(sel.id, "approved")}>Approve</button>}
+              {sel.status === "draft" && <button className="cal-reject" onClick={() => act(sel.id, "needs_approval")}>Submit for approval</button>}
+              {["draft", "needs_approval"].includes(sel.status) && <button className="cal-approve" onClick={() => act(sel.id, "approved")}>Approve &amp; schedule</button>}
               {["needs_approval", "approved", "scheduled"].includes(sel.status) && <button className="cal-reject" onClick={() => act(sel.id, "draft")}>Send back to draft</button>}
+              {sel.status !== "published" && sel.status !== "publishing" && (
+                <button className="cal-reject" onClick={() => { setSel(null); document.getElementById("posts")?.scrollIntoView({ behavior: "smooth" }); }}>Edit in Posts ↑</button>
+              )}
             </div>
           </div>
         </div>

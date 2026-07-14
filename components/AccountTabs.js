@@ -7,7 +7,10 @@ export default function AccountTabs({ accountId, active, days = 30 }) {
         Paid Marketing
       </Link>
       <Link href={`/accounts/${accountId}/content`} className={"acct-tab" + (active === "content" ? " active" : "")}>
-        Content Marketing
+        Content
+      </Link>
+      <Link href={`/accounts/${accountId}/engage`} className={"acct-tab" + (active === "engage" ? " active" : "")}>
+        Listen &amp; Create
       </Link>
     </div>
   );

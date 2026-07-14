@@ -71,7 +71,17 @@ function SocialConnect({ clientId, client, social }) {
 }
 
 /* ---------------- Composer ---------------- */
-function Composer({ clientId, social, seedDate, onDone }) {
+function nowPlus30() {
+  const d = new Date(Date.now() + 30 * 60000 - new Date().getTimezoneOffset() * 60000);
+  return d.toISOString().slice(0, 16);
+}
+function toLocalInput(iso) {
+  if (!iso) return "";
+  const d = new Date(new Date(iso).getTime() - new Date().getTimezoneOffset() * 60000);
+  return d.toISOString().slice(0, 16);
+}
+
+function Composer({ clientId, social, seedDate, editItem, onDone }) {
   const router = useRouter();
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
@@ -83,16 +93,19 @@ function Composer({ clientId, social, seedDate, onDone }) {
     if (social?.ig_user_id) a.push({ key: "instagram", label: social.ig_username ? "@" + social.ig_username : "Instagram", handle: "Instagram" });
     return a;
   }, [social]);
-  const [channels, setChannels] = useState(() => (social?.fb_page_id ? ["facebook"] : social?.ig_user_id ? ["instagram"] : []));
-  const [customize, setCustomize] = useState(false);
-  const [caption, setCaption] = useState("");
-  const [variants, setVariants] = useState({ facebook: { caption: "", post_type: "feed" }, instagram: { caption: "", post_type: "feed" } });
-  const [baseType, setBaseType] = useState("feed");
-  const [link, setLink] = useState("");
-  const [media, setMedia] = useState([]);
+  const [channels, setChannels] = useState(() => editItem?.channels?.length ? editItem.channels : (social?.fb_page_id ? ["facebook"] : social?.ig_user_id ? ["instagram"] : []));
+  const [customize, setCustomize] = useState(() => !!(editItem?.variants && Object.keys(editItem.variants).length));
+  const [caption, setCaption] = useState(editItem?.caption || "");
+  const [variants, setVariants] = useState(() => ({
+    facebook: { caption: editItem?.variants?.facebook?.caption || "", post_type: editItem?.variants?.facebook?.post_type || "feed" },
+    instagram: { caption: editItem?.variants?.instagram?.caption || "", post_type: editItem?.variants?.instagram?.post_type || "feed" },
+  }));
+  const [baseType, setBaseType] = useState(editItem?.post_type || "feed");
+  const [link, setLink] = useState(editItem?.link || "");
+  const [media, setMedia] = useState(editItem?.media_urls || []);
   const [videoUrl, setVideoUrl] = useState("");
-  const [firstComment, setFirstComment] = useState("");
-  const [scheduledAt, setScheduledAt] = useState(seedDate || "");
+  const [firstComment, setFirstComment] = useState(editItem?.first_comment || "");
+  const [scheduledAt, setScheduledAt] = useState(seedDate || (editItem?.scheduled_at ? toLocalInput(editItem.scheduled_at) : nowPlus30()));
   const [activeTab, setActiveTab] = useState(channels[0] || "facebook");
 
   function flash(t) { setMsg(t); setTimeout(() => setMsg(""), 7000); }
@@ -151,18 +164,27 @@ function Composer({ clientId, social, seedDate, onDone }) {
     const payloadVariants = customize
       ? Object.fromEntries(channels.map((ch) => [ch, { caption: variants[ch]?.caption || "", post_type: variants[ch]?.post_type || "feed" }]))
       : {};
+    const fields = {
+      clientId, channels, caption, link: link || null, mediaUrls,
+      postType: baseType, variants: payloadVariants, firstComment: firstComment || null,
+      scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+    };
+    const label = status === "draft" ? "Saved as draft." : status === "needs_approval" ? "Submitted for approval." : "Approved & scheduled.";
     try {
-      const r = await fetch("/api/content", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          op: "create", clientId, channels, caption, link: link || null, mediaUrls,
-          postType: baseType, variants: payloadVariants, firstComment: firstComment || null,
-          scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null, status,
-        }),
-      });
-      const d = await r.json();
+      let d;
+      if (editItem) {
+        const r1 = await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "update", id: editItem.id, ...fields }) });
+        d = await r1.json();
+        if (!d.error) {
+          const r2 = await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "status", id: editItem.id, status, approvedBy: "agency" }) });
+          d = await r2.json();
+        }
+      } else {
+        const r = await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "create", ...fields, status }) });
+        d = await r.json();
+      }
       if (d.error) flash("Error: " + d.error);
-      else { onDone(status === "draft" ? "Saved as draft." : status === "needs_approval" ? "Submitted for approval." : "Approved & scheduled."); router.refresh(); }
+      else { onDone(label); router.refresh(); }
     } finally { setBusy(""); }
   }
 
@@ -327,7 +349,14 @@ export default function ContentManager({ clientId, client, items, social, open: 
   const setOpen = setOpenProp || setOpenLocal;
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
+  const [editItem, setEditItem] = useState(null);
   function flash(t) { setMsg(t); setTimeout(() => setMsg(""), 6000); }
+
+  function startEdit(it) {
+    setEditItem(it);
+    setOpen(true);
+    document.getElementById("posts")?.scrollIntoView({ behavior: "smooth" });
+  }
 
   async function itemAction(id, status) {
     setBusy(id + status);
@@ -349,14 +378,19 @@ export default function ContentManager({ clientId, client, items, social, open: 
     <div className="panel">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <h2>Content</h2>
-        <button className="studio-btn" onClick={() => setOpen((o) => !o)}>{open ? "Close composer" : "+ New post"}</button>
+        <button className="studio-btn" onClick={() => { setEditItem(null); setOpen((o) => !o); }}>{open ? "Close composer" : "+ New post"}</button>
       </div>
       <p className="note">Compose, schedule, and approve social posts for {client}. Approved posts publish automatically at their scheduled time.</p>
 
       <SocialConnect clientId={clientId} client={client} social={social} />
       {msg && <div className="mng-msg">{msg}</div>}
 
-      {open && <Composer clientId={clientId} social={social} seedDate={seedDate} onDone={(m) => { flash(m); setOpen(false); }} />}
+      {open && (
+        <>
+          {editItem && <div className="cmp-editing">Editing an existing {STATUS_LABEL[editItem.status]?.toLowerCase()} post</div>}
+          <Composer key={editItem?.id || "new"} clientId={clientId} social={social} seedDate={seedDate} editItem={editItem} onDone={(m) => { flash(m); setOpen(false); setEditItem(null); }} />
+        </>
+      )}
 
       {items.length === 0 ? (
         <div className="muted" style={{ fontSize: 13 }}>No content yet.</div>
@@ -376,7 +410,9 @@ export default function ContentManager({ clientId, client, items, social, open: 
                 {it.error && <div className="push-err">{it.error}</div>}
               </div>
               <div className="content-actions">
-                {it.status === "needs_approval" && <button className="cal-approve" disabled={busy === it.id + "approved"} onClick={() => itemAction(it.id, "approved")}>Approve</button>}
+                {it.status !== "published" && it.status !== "publishing" && <button onClick={() => startEdit(it)}>Edit</button>}
+                {it.status === "draft" && <button disabled={busy === it.id + "needs_approval"} onClick={() => itemAction(it.id, "needs_approval")}>Submit</button>}
+                {(it.status === "draft" || it.status === "needs_approval") && <button className="cal-approve" disabled={busy === it.id + "approved"} onClick={() => itemAction(it.id, "approved")}>Approve</button>}
                 {["approved", "scheduled"].includes(it.status) && <button disabled={busy === it.id + "draft"} onClick={() => itemAction(it.id, "draft")}>Unschedule</button>}
                 {it.status === "failed" && <button disabled={busy === it.id + "approved"} onClick={() => itemAction(it.id, "approved")}>Retry</button>}
                 {it.status !== "published" && <button className="rule-del" disabled={busy === it.id + "del"} onClick={() => del(it.id)}>Delete</button>}

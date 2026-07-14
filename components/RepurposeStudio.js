@@ -106,24 +106,25 @@ export default function RepurposeStudio({ clientId, client, brand, seed, seedIma
     } finally { setBusy(""); }
   }
 
-  async function createDraft() {
-    if (!ugc) { flash("Upload a UGC image first."); return; }
+  async function createDraft(applyKit) {
+    if (!ugc) { flash("Add a UGC image first."); return; }
     if (!caption.trim()) { flash("Pick or write a caption."); return; }
-    setBusy("draft");
+    setBusy(applyKit ? "draft" : "asis");
     try {
       let media = ugc;
-      try {
-        const c = canvasRef.current;
-        const dataUrl = c.toDataURL("image/png");
-        media = await upload(dataUrl, "repurposed.png");
-      } catch { flash("Couldn't composite (image blocked cross-origin) — saved the raw UGC instead."); }
+      if (applyKit) {
+        try {
+          const c = canvasRef.current;
+          media = await upload(c.toDataURL("image/png"), "repurposed.png");
+        } catch { flash("Couldn't composite (image blocked cross-origin) — saved the raw image instead."); }
+      }
       const r = await fetch("/api/content", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ op: "create", clientId, caption, channels: ["instagram", "facebook"], mediaUrls: [media], status: "draft" }),
       });
       const d = await r.json();
       if (d.error) flash("Error: " + d.error);
-      else { flash("Branded draft created — find it under Posts / Calendar."); router.refresh(); }
+      else { flash("Draft created — find it under Posts / Calendar."); router.refresh(); }
     } finally { setBusy(""); }
   }
 
@@ -178,7 +179,11 @@ export default function RepurposeStudio({ clientId, client, brand, seed, seedIma
 
           <label className="rep-label">Caption</label>
           <textarea rows={4} value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Final caption…" />
-          <button className="push-create" onClick={createDraft} disabled={busy === "draft"}>{busy === "draft" ? "Saving…" : "Create branded draft"}</button>
+          <div className="rep-create">
+            <button className="push-create" onClick={() => createDraft(true)} disabled={!!busy}>{busy === "draft" ? "Saving…" : "Create branded draft"}</button>
+            <button className="cmp-btn ghost" onClick={() => createDraft(false)} disabled={!!busy}>{busy === "asis" ? "Saving…" : "Post image as-is"}</button>
+          </div>
+          <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>Branded = UGC on your brand background. As-is = the original image, untouched.</div>
         </div>
         <div className="rep-right">
           <canvas ref={canvasRef} className="rep-canvas" />

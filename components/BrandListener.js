@@ -16,9 +16,15 @@ export default function BrandListener({ clientId, sources, mentions, onRepurpose
   const [msg, setMsg] = useState("");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ kind: "rss", label: "", url: "", query: "", provider: "" });
+  const [filter, setFilter] = useState("all");
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   function flash(t) { setMsg(t); setTimeout(() => setMsg(""), 6000); }
   const hasMeta = sources.some((s) => s.kind === "meta");
+
+  const platformOf = (m) => (String(m.mtype || "").startsWith("fb") ? "facebook" : String(m.mtype || "").startsWith("ig") ? "instagram" : "web");
+  const counts = mentions.reduce((a, m) => { const p = platformOf(m); a[p] = (a[p] || 0) + 1; return a; }, {});
+  const shown = filter === "all" ? mentions : mentions.filter((m) => platformOf(m) === filter);
+  const FILTERS = [["all", "All", mentions.length], ["facebook", "Facebook", counts.facebook || 0], ["instagram", "Instagram", counts.instagram || 0], ["web", "Web", counts.web || 0]];
 
   async function post(payload) {
     const r = await fetch("/api/brand-sources", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
@@ -113,9 +119,20 @@ export default function BrandListener({ clientId, sources, mentions, onRepurpose
             <div key={s.id} className={"src-chip" + (s.enabled ? "" : " off")}>
               <span className="src-kind">{s.kind}</span>
               <span className="src-label">{s.label || s.url || s.query}</span>
-              <button onClick={async () => { setBusy(s.id); await post({ op: "toggle", id: s.id, enabled: !s.enabled }); router.refresh(); setBusy(""); }}>{s.enabled ? "off" : "on"}</button>
-              <button className="rule-del" onClick={async () => { if (!confirm("Remove this source?")) return; setBusy(s.id); await post({ op: "delete", id: s.id }); router.refresh(); setBusy(""); }}>×</button>
+              <button className={"src-toggle " + (s.enabled ? "on" : "off")} title={s.enabled ? "Enabled — click to pause" : "Paused — click to enable"}
+                onClick={async () => { setBusy(s.id); await post({ op: "toggle", id: s.id, enabled: !s.enabled }); router.refresh(); setBusy(""); }}>
+                {s.enabled ? "On" : "Off"}
+              </button>
+              <button className="src-remove" title="Remove source" onClick={async () => { if (!confirm("Remove this source?")) return; setBusy(s.id); await post({ op: "delete", id: s.id }); router.refresh(); setBusy(""); }}>×</button>
             </div>
+          ))}
+        </div>
+      )}
+
+      {mentions.length > 0 && (
+        <div className="listen-filter">
+          {FILTERS.map(([k, label, n]) => (
+            <button key={k} className={"lf-btn" + (filter === k ? " active" : "")} onClick={() => setFilter(k)}>{label} <span className="lf-count">{n}</span></button>
           ))}
         </div>
       )}
@@ -124,7 +141,7 @@ export default function BrandListener({ clientId, sources, mentions, onRepurpose
         <div className="muted" style={{ fontSize: 13, marginTop: 10 }}>No mentions yet. Add a source and hit “Refresh now.”</div>
       ) : (
         <div className="mention-list">
-          {mentions.map((m) => (
+          {shown.map((m) => (
             <Mention key={m.id} clientId={clientId} m={m} onRepurpose={onRepurpose} />
           ))}
         </div>
