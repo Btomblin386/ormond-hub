@@ -4,7 +4,11 @@ import { NextResponse } from "next/server";
 export function middleware(req) {
   const { pathname } = req.nextUrl;
   const isAuthPath =
-    pathname.startsWith("/login") || pathname.startsWith("/api/login");
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/api/login") ||
+    pathname.startsWith("/privacy") ||         // public: required for Meta app review
+    pathname.startsWith("/terms") ||           // public: required for Meta app review
+    pathname.startsWith("/data-deletion");     // public: required for Meta app review
   const authed = req.cookies.get("hub_auth")?.value === process.env.DASHBOARD_PASSWORD;
 
   if (!authed && !isAuthPath) {
