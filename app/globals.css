@@ -655,3 +655,6 @@ tr:hover .row-rename { visibility: visible; }
 .assist-run:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(99,102,241,.38); }
 .assist-run:disabled { opacity: .55; cursor: default; box-shadow: none; }
 .task-row { box-shadow: 0 1px 4px rgba(15,20,32,.04); }
+
+/* ---------- Form elements inherit the app font (kills serif/mono defaults) ---------- */
+input, textarea, select, button { font-family: inherit; font-size: inherit; }

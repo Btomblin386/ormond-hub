@@ -1,11 +1,15 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ContentManager from "./ContentManager";
 import ContentCalendar from "./ContentCalendar";
 
 export default function ContentBoard({ clientId, client, items, socials, editId, notes = [], teamMembers = [] }) {
   const [composerOpen, setComposerOpen] = useState(false);
   const [seedDate, setSeedDate] = useState("");
+
+  // A day-modal "Create post" seeds the composer with that date; once the
+  // composer closes, drop the seed so a later "+ New post" defaults to now+30m.
+  useEffect(() => { if (!composerOpen) setSeedDate(""); }, [composerOpen]);
   const calItems = items.map((it) => ({ ...it, client }));
 
   function onCreateOnDate(dateValue) {
