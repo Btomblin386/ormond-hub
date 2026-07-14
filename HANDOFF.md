@@ -13,6 +13,20 @@ content scheduling/approval, brand listening, and repurposing — across ~5 bran
 ## Vercel env vars
 - `DATABASE_URL` — Supabase transaction pooler URI.
 - `DASHBOARD_PASSWORD` — legacy agency password AND the HMAC signing key for per-user sessions.
+- `GOOGLE_OAUTH_CLIENT_ID` — Google OAuth web client (the SECRET lives only in Supabase secrets).
+
+## Google OAuth setup (one-time, Brooks)
+1. Google Cloud Console → new project (or reuse) → enable **Google Analytics Data API**, **Google Analytics
+   Admin API**, and **Google Ads API**.
+2. OAuth consent screen: External; scopes `analytics.readonly`, `adwords`, `email`; add yourself as test user
+   (or publish).
+3. Credentials → OAuth client ID (Web application). Authorized redirect URIs:
+   `https://<prod-domain>/api/oauth/google/callback` (+ `http://localhost:3000/api/oauth/google/callback` for dev).
+4. Set `GOOGLE_OAUTH_CLIENT_ID` in Vercel + `.env`; set `GOOGLE_OAUTH_CLIENT_ID` and
+   `GOOGLE_OAUTH_CLIENT_SECRET` in Supabase → Edge Functions → Secrets.
+5. `/onboard` → Continue with Google → pick GA4 properties per client. Data flows on the next ingest cron.
+6. Google Ads: apply for the developer token (1–4 wk) — OAuth consent is already collected; ingestion is the
+   remaining build.
 
 ## Auth & roles (lib/auth.js, lib/session.js, middleware.js)
 - Legacy: `DASHBOARD_PASSWORD` → full **agency** access (cookie `hub_auth`). Zero lock-out.
@@ -32,7 +46,11 @@ oauth_tokens (FB Login user tokens), app_users, user_profiles.
 
 ### Edge functions (SOURCE ONLY ON SUPABASE — download via `supabase functions download <name>`)
 - meta-ingest, meta-backfill, meta-discover-accounts — Meta ads data.
-- ga4-ingest, ga4-history — GA4 via service-account JWT.
+- ga4-ingest (v8), ga4-history — GA4. Per-property auth: `ga4_properties.auth_kind` = 'service_account'
+  (GA4_SA_JSON, legacy/Slavens) or 'oauth' (refresh token in oauth_tokens via `oauth_token_id`).
+- oauth-google — Google OAuth onboarding (exchange/list GA4 properties/connect). Scopes requested up front:
+  analytics.readonly + adwords (Google Ads ingestion becomes possible once the developer token is approved;
+  consent is already banked in oauth_tokens.scopes). Secrets: GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET.
 - generate-insights (v6), account-chat (v5), campaign-plan (v6) — AI (Anthropic). All three read the brand's
   identity from `clients.brand_settings.business_desc` (+ brand_voice) — set per brand in the Repurpose Studio
   brand kit; NEVER hardcode a vertical in these prompts. account-chat can emit a ```proposal``` JSON fence
@@ -94,6 +112,12 @@ Also requested (not yet scheduled):
 - Social insights tab (pin/enter starting stats + date, track over selectable periods).
 - Push/email alerts for approvals + missed schedules (currently in-app notifications only).
 - Full top-nav conversion (OneUp-style) — layout is widened but nav still left-rail.
+
+## Recently shipped (2026-07-14, Google OAuth)
+- **Google OAuth onboarding** — /onboard now has "Continue with Google": OAuth (offline, consent) →
+  oauth-google edge fn stores refresh token → pick GA4 properties → ga4_properties rows with
+  auth_kind='oauth'. ga4-ingest v8 authenticates per property (SA or OAuth); Slavens SA path verified live.
+  Blocked on Brooks: Google Cloud OAuth client + Supabase secrets (see setup section above).
 
 ## Recently shipped (2026-07-14, later batch)
 - **Actionable account chat** — chat proposes changes as a card (pause/resume, budget w/ cap, create-paused
