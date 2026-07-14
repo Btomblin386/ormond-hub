@@ -243,6 +243,13 @@ td a.rowlink { color: #4338ca; font-weight: 600; }
 .cbadge { font-size: 10px; text-transform: uppercase; font-weight: 700; letter-spacing: .03em; padding: 2px 7px; border-radius: 999px; white-space: nowrap; }
 .cbadge.draft { background: #f3f4f6; color: #6b7280; }
 .cbadge.needs_approval { background: #fef3c7; color: #b45309; }
+.cbadge.needs_revisions { background: #ffe4e6; color: #be123c; }
+.cal-chip.needs_revisions { background: #f43f5e; }
+.content-note { font-size: 12px; color: #9d174d; background: #fdf2f8; border-radius: 6px; padding: 4px 8px; margin-top: 4px; display: inline-block; }
+.cal-quick { margin: 6px 0 10px; }
+.cal-quick label { display: block; font-size: 11px; font-weight: 600; color: #6b7280; margin: 8px 0 3px; }
+.cal-quick textarea { width: 100%; padding: 7px 9px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 13px; font-family: inherit; }
+.cal-quick-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 .cbadge.approved { background: #e0e7ff; color: #4338ca; }
 .cbadge.scheduled { background: #dbeafe; color: #1d4ed8; }
 .cbadge.publishing { background: #ede9fe; color: #6d28d9; }

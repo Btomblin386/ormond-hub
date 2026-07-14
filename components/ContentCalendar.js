@@ -1,9 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 const STATUS_LABEL = {
-  draft: "Draft", needs_approval: "Needs approval", approved: "Approved",
+  draft: "Draft", needs_approval: "Needs approval", needs_revisions: "Needs revisions", approved: "Approved",
   scheduled: "Scheduled", publishing: "Publishing", published: "Published", failed: "Failed",
 };
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -23,6 +23,17 @@ export default function ContentCalendar({ items, onCreateOnDate, title, showClie
   const [dragId, setDragId] = useState(null);
   const [overKey, setOverKey] = useState(null);
   const [menu, setMenu] = useState(null); // {x,y,key}
+  const [qCaption, setQCaption] = useState("");
+  const [qNote, setQNote] = useState("");
+  useEffect(() => { setQCaption(sel?.caption || ""); setQNote(sel?.note || ""); }, [sel]);
+
+  async function post(op, body) {
+    await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op, ...body }) });
+    router.refresh();
+  }
+  async function saveQuick() { setBusy("q"); try { await post("patch", { id: sel.id, caption: qCaption, note: qNote }); setSel(null); } finally { setBusy(""); } }
+  async function reqRevisions() { setBusy("q"); try { await post("revisions", { id: sel.id, note: qNote }); setSel(null); } finally { setBusy(""); } }
+  function openComposer() { setSel(null); router.push(`/accounts/${sel.client_id}/content?edit=${sel.id}`); }
 
   const year = cursor.getFullYear(), month = cursor.getMonth();
   const startPad = new Date(year, month, 1).getDay();
@@ -137,15 +148,27 @@ export default function ContentCalendar({ items, onCreateOnDate, title, showClie
             {Array.isArray(sel.media_urls) && sel.media_urls.length > 0 && (
               <div className="cal-modal-media">{sel.media_urls.slice(0, 4).map((u, j) => <img key={j} src={u} alt="" />)}</div>
             )}
-            <div className="cal-modal-cap">{sel.caption || "(no caption)"}</div>
+
+            {sel.status === "published" || sel.status === "publishing" ? (
+              <div className="cal-modal-cap">{sel.caption || "(no caption)"}</div>
+            ) : (
+              <div className="cal-quick">
+                <label>Caption</label>
+                <textarea rows={3} value={qCaption} onChange={(e) => setQCaption(e.target.value)} />
+                <label>Note {sel.status === "needs_revisions" ? "· revisions requested" : "(for the team)"}</label>
+                <textarea rows={2} value={qNote} onChange={(e) => setQNote(e.target.value)} placeholder="Leave a note — e.g. for Brie to review…" />
+                <div className="cal-quick-actions">
+                  <button className="cal-approve" disabled={busy === "q"} onClick={saveQuick}>Save changes</button>
+                  <button className="cal-reject" disabled={busy === "q"} onClick={reqRevisions}>Request revisions</button>
+                  <button className="cal-reject" onClick={openComposer}>Open in composer →</button>
+                </div>
+              </div>
+            )}
             {sel.error && <div className="push-err">{sel.error}</div>}
             <div className="cal-modal-actions">
-              {sel.status === "draft" && <button className="cal-reject" onClick={() => act(sel.id, "needs_approval")}>Submit for approval</button>}
-              {["draft", "needs_approval"].includes(sel.status) && <button className="cal-approve" onClick={() => act(sel.id, "approved")}>Approve &amp; schedule</button>}
+              {(sel.status === "draft" || sel.status === "needs_revisions") && <button className="cal-reject" onClick={() => act(sel.id, "needs_approval")}>Submit for approval</button>}
+              {["draft", "needs_approval", "needs_revisions"].includes(sel.status) && <button className="cal-approve" onClick={() => act(sel.id, "approved")}>Approve &amp; schedule</button>}
               {["needs_approval", "approved", "scheduled"].includes(sel.status) && <button className="cal-reject" onClick={() => act(sel.id, "draft")}>Send back to draft</button>}
-              {sel.status !== "published" && sel.status !== "publishing" && (
-                <button className="cal-reject" onClick={() => { setSel(null); document.getElementById("posts")?.scrollIntoView({ behavior: "smooth" }); }}>Edit in Posts ↑</button>
-              )}
             </div>
           </div>
         </div>

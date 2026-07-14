@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { fileToB64, cropToRatio, uploadImage, imageSize, IG_RATIOS, IG_FEED_MIN, IG_FEED_MAX, videoMeta, validateReel } from "../lib/media";
 
 const STATUS_LABEL = {
-  draft: "Draft", needs_approval: "Needs approval", approved: "Approved",
+  draft: "Draft", needs_approval: "Needs approval", needs_revisions: "Needs revisions", approved: "Approved",
   scheduled: "Scheduled", publishing: "Publishing", published: "Published", failed: "Failed",
 };
 const LIMITS = { instagram: 2200, facebook: 63206 };
@@ -86,7 +86,13 @@ function Composer({ clientId, social, seedDate, editItem, onDone }) {
     if (social?.ig_user_id) a.push({ key: "instagram", label: social.ig_username ? "@" + social.ig_username : "Instagram", handle: "Instagram" });
     return a;
   }, [social]);
-  const [channels, setChannels] = useState(() => editItem?.channels?.length ? editItem.channels : (social?.fb_page_id ? ["facebook"] : social?.ig_user_id ? ["instagram"] : []));
+  const [channels, setChannels] = useState(() => {
+    if (editItem?.channels?.length) return editItem.channels;
+    const all = [];
+    if (social?.fb_page_id) all.push("facebook");
+    if (social?.ig_user_id) all.push("instagram");
+    return all; // default: all connected channels selected
+  });
   const [customize, setCustomize] = useState(() => !!(editItem?.variants && Object.keys(editItem.variants).length));
   const [caption, setCaption] = useState(editItem?.caption || "");
   const [variants, setVariants] = useState(() => ({
@@ -370,7 +376,7 @@ function TypePicker({ value, onChange }) {
 }
 
 /* ---------------- Main ---------------- */
-export default function ContentManager({ clientId, client, items, social, open: openProp, setOpen: setOpenProp, seedDate }) {
+export default function ContentManager({ clientId, client, items, social, open: openProp, setOpen: setOpenProp, seedDate, editId }) {
   const router = useRouter();
   const [openLocal, setOpenLocal] = useState(false);
   const open = openProp !== undefined ? openProp : openLocal;
@@ -386,10 +392,27 @@ export default function ContentManager({ clientId, client, items, social, open: 
     document.getElementById("posts")?.scrollIntoView({ behavior: "smooth" });
   }
 
+  // Open composer in edit mode when arriving with ?edit=<id> (e.g. from the Agency calendar)
+  useEffect(() => {
+    if (!editId) return;
+    const it = items.find((x) => x.id === editId);
+    if (it) startEdit(it);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editId]);
+
   async function itemAction(id, status) {
     setBusy(id + status);
     try {
       await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "status", id, status, approvedBy: "agency" }) });
+      router.refresh();
+    } finally { setBusy(""); }
+  }
+  async function requestRevisions(id) {
+    const note = window.prompt("What needs changing? (leave a note for the creator)");
+    if (note === null) return;
+    setBusy(id + "rev");
+    try {
+      await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "revisions", id, note }) });
       router.refresh();
     } finally { setBusy(""); }
   }
@@ -435,6 +458,7 @@ export default function ContentManager({ clientId, client, items, social, open: 
                   <span className="content-when">{it.scheduled_at ? new Date(it.scheduled_at).toLocaleString() : it.published_at ? "Published " + new Date(it.published_at).toLocaleDateString() : "no date"}</span>
                 </div>
                 <div className="content-cap">{it.caption?.slice(0, 140) || "(no caption)"}</div>
+                {it.note && <div className="content-note">📝 {it.note}</div>}
                 {it.error && (
                   <div className={"content-err " + (it.error_kind || "permanent")}>
                     <span className="err-flag">{it.error_kind === "transient" ? "⏳ Temporary — retry shortly" : "⚠ Needs a fix"}</span>
@@ -444,8 +468,9 @@ export default function ContentManager({ clientId, client, items, social, open: 
               </div>
               <div className="content-actions">
                 {it.status !== "published" && it.status !== "publishing" && <button onClick={() => startEdit(it)}>Edit</button>}
-                {it.status === "draft" && <button disabled={busy === it.id + "needs_approval"} onClick={() => itemAction(it.id, "needs_approval")}>Submit</button>}
-                {(it.status === "draft" || it.status === "needs_approval") && <button className="cal-approve" disabled={busy === it.id + "approved"} onClick={() => itemAction(it.id, "approved")}>Approve</button>}
+                {(it.status === "draft" || it.status === "needs_revisions") && <button disabled={busy === it.id + "needs_approval"} onClick={() => itemAction(it.id, "needs_approval")}>Submit</button>}
+                {it.status === "needs_approval" && <button disabled={busy === it.id + "rev"} onClick={() => requestRevisions(it.id)}>Request revisions</button>}
+                {(it.status === "draft" || it.status === "needs_approval" || it.status === "needs_revisions") && <button className="cal-approve" disabled={busy === it.id + "approved"} onClick={() => itemAction(it.id, "approved")}>Approve</button>}
                 {["approved", "scheduled"].includes(it.status) && <button disabled={busy === it.id + "draft"} onClick={() => itemAction(it.id, "draft")}>Unschedule</button>}
                 {it.status === "failed" && <button disabled={busy === it.id + "approved"} onClick={() => itemAction(it.id, "approved")}>Retry</button>}
                 {it.status !== "published" && <button className="rule-del" disabled={busy === it.id + "del"} onClick={() => del(it.id)}>Delete</button>}

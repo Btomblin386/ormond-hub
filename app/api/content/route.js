@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { createContent, updateContent, setContentStatus, deleteContent, rescheduleContent } from "../../../lib/db";
+import { createContent, updateContent, setContentStatus, deleteContent, rescheduleContent, setContentRevisions, patchContent } from "../../../lib/db";
 
 export const dynamic = "force-dynamic";
 
-const STATUSES = ["draft", "needs_approval", "approved", "scheduled", "published", "failed"];
+const STATUSES = ["draft", "needs_approval", "needs_revisions", "approved", "scheduled", "published", "failed"];
 
 export async function POST(req) {
   try {
@@ -27,6 +27,14 @@ export async function POST(req) {
     }
     if (op === "reschedule") {
       await rescheduleContent(b.id, b.scheduledAt ? new Date(b.scheduledAt).toISOString() : null);
+      return NextResponse.json({ ok: true });
+    }
+    if (op === "revisions") {
+      await setContentRevisions(b.id, b.note || null);
+      return NextResponse.json({ ok: true });
+    }
+    if (op === "patch") {
+      await patchContent(b.id, { caption: b.caption, note: b.note });
       return NextResponse.json({ ok: true });
     }
     if (op === "delete") {

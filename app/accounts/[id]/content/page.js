@@ -7,7 +7,7 @@ import { accountById, contentForClient, socialForClient } from "../../../../lib/
 
 export const dynamic = "force-dynamic";
 
-export default async function AccountContent({ params }) {
+export default async function AccountContent({ params, searchParams }) {
   const acct = await accountById(params.id);
   if (!acct) notFound();
 
@@ -23,7 +23,7 @@ export default async function AccountContent({ params }) {
 
       <AccountTabs accountId={acct.id} active="content" />
 
-      <ContentBoard clientId={acct.client_id} client={acct.client} items={items} social={social} />
+      <ContentBoard clientId={acct.client_id} client={acct.client} items={items} social={social} editId={searchParams?.edit || null} />
     </Shell>
   );
 }

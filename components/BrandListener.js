@@ -40,11 +40,13 @@ export default function BrandListener({ clientId, sources, mentions, onRepurpose
   }
   async function add() {
     if (form.kind === "rss" && !form.url) { flash("Add the feed URL."); return; }
+    if (form.kind === "hashtag" && !form.query) { flash("Enter a hashtag."); return; }
     setBusy("add");
     try {
-      const d = await post({ op: "add", clientId, ...form });
+      const label = form.label || (form.kind === "hashtag" ? form.query : "");
+      const d = await post({ op: "add", clientId, ...form, label });
       if (d.error) flash("Error: " + d.error);
-      else { setForm({ kind: "rss", label: "", url: "", query: "", provider: "" }); setOpen(false); router.refresh(); }
+      else { setForm({ kind: "rss", label: "", url: "", query: "", provider: "" }); setOpen(false); await post({ op: "poll", clientId }); router.refresh(); }
     } finally { setBusy(""); }
   }
   async function poll() {
@@ -86,6 +88,7 @@ export default function BrandListener({ clientId, sources, mentions, onRepurpose
               <label>Type</label>
               <select value={form.kind} onChange={(e) => set("kind", e.target.value)}>
                 <option value="rss">RSS feed</option>
+                <option value="hashtag">Instagram hashtag</option>
                 <option value="api">Provider API</option>
               </select>
             </div>
@@ -99,6 +102,12 @@ export default function BrandListener({ clientId, sources, mentions, onRepurpose
               <label>Feed URL</label>
               <input type="url" value={form.url} onChange={(e) => set("url", e.target.value)} placeholder="https://www.google.com/alerts/feeds/…" />
               <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>Tip: create a Google Alert → deliver to “RSS feed” → paste the feed URL here. Reddit: add .rss to a search URL.</div>
+            </>
+          ) : form.kind === "hashtag" ? (
+            <>
+              <label>Hashtag</label>
+              <input type="text" value={form.query} onChange={(e) => set("query", e.target.value)} placeholder="#slavensracing" />
+              <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>Pulls recent public Instagram posts using this hashtag (via your connected IG account).</div>
             </>
           ) : (
             <>

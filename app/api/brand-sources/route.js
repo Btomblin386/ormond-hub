@@ -14,6 +14,7 @@ export async function POST(req) {
     if (b.op === "add") {
       if (!b.clientId) return NextResponse.json({ error: "missing clientId" }, { status: 400 });
       if (b.kind === "rss" && !b.url) return NextResponse.json({ error: "RSS source needs a feed URL" }, { status: 400 });
+      if (b.kind === "hashtag" && !b.query) return NextResponse.json({ error: "Hashtag source needs a tag" }, { status: 400 });
       const [row] = await addBrandSource(b);
       return NextResponse.json({ ok: true, id: row.id });
     }
