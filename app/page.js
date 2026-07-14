@@ -1,18 +1,18 @@
 import Shell from "../components/Shell";
-import TrendChart from "../components/TrendChart";
 import AccountRow from "../components/AccountRow";
+import AccountTrends from "../components/AccountTrends";
 import NotificationsFeed from "../components/NotificationsFeed";
 import ContentCalendar from "../components/ContentCalendar";
-import { agencyTotals, spendTrend, accountsList, agencyNotifications, contentCalendar } from "../lib/db";
+import { agencyTotals, accountsList, accountsTrendDaily, agencyNotifications, contentCalendar } from "../lib/db";
 import { money, num, roas, roasClass } from "../lib/format";
 
 export const dynamic = "force-dynamic";
 
 export default async function Overview({ searchParams }) {
   const days = Number(searchParams?.days) || 30;
-  const [totals, trend, accounts, notifications, calendar] = await Promise.all([
+  const [totals, trendRows, accounts, notifications, calendar] = await Promise.all([
     agencyTotals(days),
-    spendTrend(days),
+    accountsTrendDaily(14),
     accountsList(days),
     agencyNotifications(),
     contentCalendar(),
@@ -49,8 +49,9 @@ export default async function Overview({ searchParams }) {
       </div>
 
       <div className="panel">
-        <h2>Daily spend vs. revenue</h2>
-        <TrendChart data={trend} />
+        <h2>Account trends · last 7 days</h2>
+        <p className="note">Spend (purple) &amp; revenue (green) per account vs. the prior 7 days. Click a card for quick analytics.</p>
+        <AccountTrends accounts={accounts.filter((a) => a.has_ads)} trends={trendRows} />
       </div>
 
       <div className="panel">
