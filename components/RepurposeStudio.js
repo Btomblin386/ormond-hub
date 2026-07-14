@@ -9,7 +9,7 @@ function loadImg(url) {
   return new Promise((res, rej) => { const im = new Image(); im.crossOrigin = "anonymous"; im.onload = () => res(im); im.onerror = rej; im.src = url; });
 }
 
-export default function RepurposeStudio({ clientId, client, brand, seed }) {
+export default function RepurposeStudio({ clientId, client, brand, seed, seedImage }) {
   const router = useRouter();
   const canvasRef = useRef(null);
   const [settings, setSettings] = useState({
@@ -25,6 +25,18 @@ export default function RepurposeStudio({ clientId, client, brand, seed }) {
   const [caption, setCaption] = useState("");
 
   useEffect(() => { if (seed) { setText(seed); } }, [seed]);
+  useEffect(() => {
+    if (!seedImage) return;
+    // Copy the mention's image into our bucket (Meta URLs expire + block canvas export)
+    (async () => {
+      setBusy("ugc");
+      try {
+        const r = await fetch("/api/content-media", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image_url: seedImage, filename: "ugc" }) });
+        const d = await r.json();
+        setUgc(d.url || seedImage);
+      } catch { setUgc(seedImage); } finally { setBusy(""); }
+    })();
+  }, [seedImage]);
   useEffect(() => { draw(); /* eslint-disable-next-line */ }, [ugc, settings.background_url, settings.logo_url, settings.brand_color]);
   function flash(t) { setMsg(t); setTimeout(() => setMsg(""), 6000); }
   const set = (k, v) => setSettings((s) => ({ ...s, [k]: v }));

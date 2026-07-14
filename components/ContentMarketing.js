@@ -7,14 +7,18 @@ import RepurposeStudio from "./RepurposeStudio";
 
 export default function ContentMarketing({ clientId, client, items, social, mentions, sources, brand }) {
   const [seed, setSeed] = useState("");
+  const [seedImage, setSeedImage] = useState("");
   const [composerOpen, setComposerOpen] = useState(false);
   const [seedDate, setSeedDate] = useState("");
   const repurposeRef = useRef(null);
 
   const calItems = items.map((it) => ({ ...it, client }));
 
-  function onRepurpose(textFromMention) {
-    setSeed(textFromMention);
+  function onRepurpose(payload) {
+    const text = typeof payload === "string" ? payload : (payload?.text || "");
+    const image = typeof payload === "string" ? "" : (payload?.image || "");
+    setSeed(text);
+    setSeedImage(image);
     document.getElementById("repurpose")?.scrollIntoView({ behavior: "smooth" });
   }
   function onCreateOnDate(dateValue) {
@@ -39,7 +43,7 @@ export default function ContentMarketing({ clientId, client, items, social, ment
       <BrandListener clientId={clientId} sources={sources} mentions={mentions} onRepurpose={onRepurpose} />
 
       <div ref={repurposeRef}>
-        <RepurposeStudio clientId={clientId} client={client} brand={brand} seed={seed} />
+        <RepurposeStudio clientId={clientId} client={client} brand={brand} seed={seed} seedImage={seedImage} />
       </div>
     </>
   );

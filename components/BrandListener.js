@@ -171,7 +171,7 @@ function Mention({ clientId, m, onRepurpose }) {
         <div className="mention-actions">
           {canReply && <button onClick={() => setReplying((r) => !r)}>{replying ? "Cancel" : "Reply"}</button>}
           {isFb && <button disabled={busy === "like"} onClick={() => act("like")}>{busy === "like" ? "…" : "Like"}</button>}
-          <button className="mention-repurpose" onClick={() => onRepurpose(`${m.title}. ${m.snippet || ""}`)}>Repurpose →</button>
+          <button className="mention-repurpose" onClick={() => onRepurpose({ text: `${m.title}. ${m.snippet || ""}`, image: m.media_url || "" })}>Repurpose →</button>
         </div>
         {replying && (
           <div className="mention-reply">
