@@ -6,8 +6,8 @@ import { useState } from "react";
 export default function NotificationsFeed({ data }) {
   const router = useRouter();
   const [busy, setBusy] = useState("");
-  const { todos = [], failed = [], ruleEvents = [], insights = [] } = data || {};
-  const total = todos.length + failed.length + ruleEvents.length + insights.length;
+  const { todos = [], failed = [], ruleEvents = [], insights = [], overdue = [] } = data || {};
+  const total = todos.length + failed.length + ruleEvents.length + insights.length + overdue.length;
 
   async function approve(id) {
     setBusy(id);
@@ -28,6 +28,16 @@ export default function NotificationsFeed({ data }) {
 
   return (
     <div className="notif-list">
+      {overdue.map((t) => (
+        <div key={"od" + t.id} className="notif overdue">
+          <span className="notif-dot overdue" />
+          <div className="notif-body">
+            <div className="notif-title">⚠ Missed schedule · <b>{t.client}</b> <span className="notif-when">was due {new Date(t.scheduled_at).toLocaleString()}</span></div>
+            <div className="notif-sub">{t.status === "needs_approval" ? "Waiting on approval — " : "Still a draft — "}{t.caption?.slice(0, 80) || "(no caption)"}</div>
+          </div>
+          <button className="cal-approve" disabled={busy === t.id} onClick={() => approve(t.id)}>Approve now</button>
+        </div>
+      ))}
       {todos.map((t) => (
         <div key={t.id} className="notif todo">
           <span className="notif-dot approval" />

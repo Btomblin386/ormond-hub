@@ -71,12 +71,19 @@ function SocialConnect({ clientId, client, social }) {
 }
 
 /* ---------------- Composer ---------------- */
-function Composer({ clientId, social, onDone }) {
+function Composer({ clientId, social, seedDate, onDone }) {
   const router = useRouter();
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
   const [uploading, setUploading] = useState(false);
-  const [channels, setChannels] = useState(["facebook"]);
+  // Which channels are actually connected for this client
+  const accounts = useMemo(() => {
+    const a = [];
+    if (social?.fb_page_id) a.push({ key: "facebook", label: social.fb_page_name || "Facebook Page", handle: "Facebook" });
+    if (social?.ig_user_id) a.push({ key: "instagram", label: social.ig_username ? "@" + social.ig_username : "Instagram", handle: "Instagram" });
+    return a;
+  }, [social]);
+  const [channels, setChannels] = useState(() => (social?.fb_page_id ? ["facebook"] : social?.ig_user_id ? ["instagram"] : []));
   const [customize, setCustomize] = useState(false);
   const [caption, setCaption] = useState("");
   const [variants, setVariants] = useState({ facebook: { caption: "", post_type: "feed" }, instagram: { caption: "", post_type: "feed" } });
@@ -85,8 +92,8 @@ function Composer({ clientId, social, onDone }) {
   const [media, setMedia] = useState([]);
   const [videoUrl, setVideoUrl] = useState("");
   const [firstComment, setFirstComment] = useState("");
-  const [scheduledAt, setScheduledAt] = useState("");
-  const [activeTab, setActiveTab] = useState("facebook");
+  const [scheduledAt, setScheduledAt] = useState(seedDate || "");
+  const [activeTab, setActiveTab] = useState(channels[0] || "facebook");
 
   function flash(t) { setMsg(t); setTimeout(() => setMsg(""), 7000); }
   function toggleChannel(c) {
@@ -164,13 +171,10 @@ function Composer({ clientId, social, onDone }) {
   return (
     <div className="composer">
       <div className="cmp-row">
-        <div className="cmp-field">
-          <label>Channels</label>
-          <div className="chan-pills">
-            {["facebook", "instagram"].map((c) => (
-              <button key={c} type="button" className={"chan-pill" + (channels.includes(c) ? " on " + c : "")} onClick={() => toggleChannel(c)}>{CHAN_LABEL[c]}</button>
-            ))}
-          </div>
+        <div className="cmp-field" style={{ flex: 1, minWidth: 260 }}>
+          <label>Post to</label>
+          <AccountSelect accounts={accounts} channels={channels} onToggle={toggleChannel}
+            onAll={() => setChannels(accounts.map((a) => a.key))} onClear={() => setChannels([])} />
         </div>
         {channels.length > 1 && (
           <label className="cmp-toggle">
@@ -260,7 +264,48 @@ function Composer({ clientId, social, onDone }) {
   );
 }
 
+function AccountSelect({ accounts, channels, onToggle, onAll, onClear }) {
+  const [open, setOpen] = useState(false);
+  const selected = accounts.filter((a) => channels.includes(a.key));
+  return (
+    <div className="acctsel">
+      <button type="button" className="acctsel-control" onClick={() => setOpen((o) => !o)}>
+        {selected.length === 0 ? <span className="acctsel-ph">Select an account</span> : (
+          <span className="acctsel-chips">
+            {selected.map((a) => (
+              <span key={a.key} className={"acctsel-chip " + a.key}>
+                {a.label}
+                <span className="acctsel-x" onClick={(e) => { e.stopPropagation(); onToggle(a.key); }}>×</span>
+              </span>
+            ))}
+          </span>
+        )}
+        <span className="acctsel-caret">▾</span>
+      </button>
+      {open && (
+        <div className="acctsel-menu" onMouseLeave={() => setOpen(false)}>
+          <div className="acctsel-actions">
+            <button type="button" onClick={onAll}>Select all</button>
+            <button type="button" onClick={onClear}>Clear</button>
+          </div>
+          {accounts.length === 0 && <div className="muted" style={{ fontSize: 12, padding: "6px 10px" }}>No accounts connected yet.</div>}
+          {accounts.map((a) => (
+            <label key={a.key} className="acctsel-opt">
+              <input type="checkbox" checked={channels.includes(a.key)} onChange={() => onToggle(a.key)} />
+              <span className={"acctsel-dot " + a.key} />
+              <span className="acctsel-lbl">{a.label}</span>
+              <span className="acctsel-plat">{a.handle}</span>
+            </label>
+          ))}
+          <div className="acctsel-soon">TikTok — coming soon</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CharCount({ value, channels }) {
+  if (!channels.length) return null;
   const limit = Math.min(...channels.map((c) => LIMITS[c]));
   return <span className={"charcount" + (value.length > limit ? " over" : "")}>{value.length}/{limit.toLocaleString()}</span>;
 }
@@ -275,9 +320,11 @@ function TypePicker({ value, onChange }) {
 }
 
 /* ---------------- Main ---------------- */
-export default function ContentManager({ clientId, client, items, social }) {
+export default function ContentManager({ clientId, client, items, social, open: openProp, setOpen: setOpenProp, seedDate }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [openLocal, setOpenLocal] = useState(false);
+  const open = openProp !== undefined ? openProp : openLocal;
+  const setOpen = setOpenProp || setOpenLocal;
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
   function flash(t) { setMsg(t); setTimeout(() => setMsg(""), 6000); }
@@ -309,7 +356,7 @@ export default function ContentManager({ clientId, client, items, social }) {
       <SocialConnect clientId={clientId} client={client} social={social} />
       {msg && <div className="mng-msg">{msg}</div>}
 
-      {open && <Composer clientId={clientId} social={social} onDone={(m) => { flash(m); setOpen(false); }} />}
+      {open && <Composer clientId={clientId} social={social} seedDate={seedDate} onDone={(m) => { flash(m); setOpen(false); }} />}
 
       {items.length === 0 ? (
         <div className="muted" style={{ fontSize: 13 }}>No content yet.</div>

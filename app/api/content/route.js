@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createContent, updateContent, setContentStatus, deleteContent } from "../../../lib/db";
+import { createContent, updateContent, setContentStatus, deleteContent, rescheduleContent } from "../../../lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +23,10 @@ export async function POST(req) {
     if (op === "status") {
       if (!STATUSES.includes(b.status)) return NextResponse.json({ error: "bad status" }, { status: 400 });
       await setContentStatus(b.id, b.status, b.approvedBy);
+      return NextResponse.json({ ok: true });
+    }
+    if (op === "reschedule") {
+      await rescheduleContent(b.id, b.scheduledAt ? new Date(b.scheduledAt).toISOString() : null);
       return NextResponse.json({ ok: true });
     }
     if (op === "delete") {
