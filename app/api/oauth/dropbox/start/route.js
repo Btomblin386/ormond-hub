@@ -16,6 +16,9 @@ export async function GET(req) {
   url.searchParams.set("redirect_uri", redirectUri);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("token_access_type", "offline"); // refresh token for scheduled/browser-free use
+  // Request scopes explicitly: tokens only carry scopes granted at authorize
+  // time, and Dropbox otherwise reuses whatever an earlier grant had.
+  url.searchParams.set("scope", "account_info.read files.metadata.read files.content.read");
   url.searchParams.set("state", state);
 
   const res = NextResponse.redirect(url.toString());
