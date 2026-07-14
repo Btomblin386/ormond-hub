@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createTask, setTaskStatus, deleteTask, triggerTaskRunner } from "../../../lib/db";
+import { getSession } from "../../../lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,8 @@ export async function POST(req) {
       if (!b.clientId || !b.title?.trim()) return NextResponse.json({ error: "missing clientId/title" }, { status: 400 });
       const kind = b.kind === "reminder" ? "reminder" : "task";
       if (kind === "reminder" && !b.dueAt) return NextResponse.json({ error: "reminders need a date" }, { status: 400 });
-      const [row] = await createTask({ clientId: b.clientId, kind, title: b.title.trim(), instructions: b.instructions?.trim() || null, dueAt: b.dueAt || null });
+      const createdBy = getSession()?.name || "Agency";
+      const [row] = await createTask({ clientId: b.clientId, kind, title: b.title.trim(), instructions: b.instructions?.trim() || null, dueAt: b.dueAt || null, createdBy, assignedTo: b.assignedTo?.trim() || null });
       if (kind === "task") await tryTrigger(row.id);
       return NextResponse.json({ ok: true, id: row.id });
     }

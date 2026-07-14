@@ -14,21 +14,26 @@ function fmtTime(iso) {
   if (!iso) return "";
   return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
+function fmtDay(key) {
+  return new Date(key + "T00:00:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+}
 
-export default function ContentCalendar({ items, onCreateOnDate, title, showClient }) {
+export default function ContentCalendar({ items, notes = [], teamMembers = [], clientId, onCreateOnDate, title, showClient }) {
   const router = useRouter();
   const [cursor, setCursor] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const [sel, setSel] = useState(null);
+  const [selNote, setSelNote] = useState(null);
+  const [dayMenu, setDayMenu] = useState(null);   // { key } -> action chooser
+  const [noteForm, setNoteForm] = useState(null); // { key, title, assignee, time }
   const [busy, setBusy] = useState("");
   const [dragId, setDragId] = useState(null);
   const [overKey, setOverKey] = useState(null);
-  const [menu, setMenu] = useState(null); // {x,y,key}
   const [qCaption, setQCaption] = useState("");
   const [qNote, setQNote] = useState("");
   useEffect(() => { setQCaption(sel?.caption || ""); setQNote(sel?.note || ""); }, [sel]);
 
-  async function post(op, body) {
-    await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op, ...body }) });
+  async function post(op, body, api = "/api/content") {
+    await fetch(api, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op, ...body }) });
     router.refresh();
   }
   async function saveQuick() { setBusy("q"); try { await post("patch", { id: sel.id, caption: qCaption, note: qNote }); setSel(null); } finally { setBusy(""); } }
@@ -44,6 +49,10 @@ export default function ContentCalendar({ items, onCreateOnDate, title, showClie
   for (const it of items) {
     if (it.scheduled_at) (byDate[keyOf(new Date(it.scheduled_at))] ||= []).push(it);
     else if (it.status === "needs_approval" || it.status === "draft") unscheduled.push(it);
+  }
+  const notesByDate = {};
+  for (const n of notes) {
+    if (n.due_at) (notesByDate[keyOf(new Date(n.due_at))] ||= []).push(n);
   }
 
   const cells = [];
@@ -71,11 +80,36 @@ export default function ContentCalendar({ items, onCreateOnDate, title, showClie
     router.refresh();
   }
 
+  function openDayMenu(key) {
+    if (!onCreateOnDate || dragId) return; // agency calendar: display-only days
+    setDayMenu({ key });
+  }
+  async function saveNote() {
+    if (!noteForm?.title?.trim()) return;
+    setBusy("note");
+    try {
+      const when = new Date(`${noteForm.key}T${noteForm.time || "09:00"}`);
+      const r = await fetch("/api/tasks", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ op: "create", clientId, kind: "reminder", title: noteForm.title.trim(), dueAt: when.toISOString(), assignedTo: noteForm.assignee || null }),
+      });
+      const d = await r.json();
+      if (!d.error) { setNoteForm(null); router.refresh(); }
+    } finally { setBusy(""); }
+  }
+  async function noteOp(id, op) {
+    setBusy(id + op);
+    try {
+      await fetch("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op, id }) });
+      setSelNote(null); router.refresh();
+    } finally { setBusy(""); }
+  }
+
   const monthName = cursor.toLocaleString(undefined, { month: "long", year: "numeric" });
   const todayKey = keyOf(new Date());
 
   return (
-    <div onClick={() => menu && setMenu(null)}>
+    <div>
       {unscheduled.length > 0 && (
         <div className="cal-unsched">
           <div className="studio-h">Needs attention · no date set</div>
@@ -88,7 +122,7 @@ export default function ContentCalendar({ items, onCreateOnDate, title, showClie
               {(it.status === "needs_approval" || it.status === "draft") && <button className="cal-approve" disabled={busy === it.id + "approved"} onClick={(e) => { e.stopPropagation(); act(it.id, "approved"); }}>Approve</button>}
             </div>
           ))}
-          <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>Tip: drag any post onto a day to schedule it. {onCreateOnDate ? "Right-click a day to create a new post." : ""}</div>
+          <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>Tip: drag any post onto a day to schedule it.{onCreateOnDate ? " Click a day to create a post or add a note." : ""}</div>
         </div>
       )}
 
@@ -107,19 +141,27 @@ export default function ContentCalendar({ items, onCreateOnDate, title, showClie
           if (!d) return <div key={i} className="cal-cell empty" />;
           const key = keyOf(d);
           const dayItems = byDate[key] || [];
+          const dayNotes = notesByDate[key] || [];
           return (
             <div key={i}
-              className={"cal-cell" + (key === todayKey ? " today" : "") + (overKey === key ? " dragover" : "")}
+              className={"cal-cell" + (key === todayKey ? " today" : "") + (overKey === key ? " dragover" : "") + (onCreateOnDate ? " clickable-day" : "")}
+              onClick={() => openDayMenu(key)}
               onDragOver={(e) => { if (dragId) { e.preventDefault(); setOverKey(key); } }}
               onDragLeave={() => setOverKey((k) => (k === key ? null : k))}
               onDrop={(e) => { e.preventDefault(); drop(d); }}
-              onContextMenu={(e) => { if (onCreateOnDate) { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY, key: `${key}T09:00` }); } }}
+              onContextMenu={(e) => { if (onCreateOnDate) { e.preventDefault(); setDayMenu({ key }); } }}
             >
               <div className="cal-daynum">{d.getDate()}</div>
+              {dayNotes.map((n) => (
+                <button key={"n" + n.id} className="cal-notechip" onClick={(e) => { e.stopPropagation(); setSelNote(n); }}
+                  title={`${n.title}${n.assigned_to ? " · " + n.assigned_to : ""}`}>
+                  <span>📝</span><span className="chip-txt">{showClient ? n.client : n.title}</span>
+                </button>
+              ))}
               {dayItems.slice(0, 4).map((it) => (
                 <button key={it.id} className={"cal-chip " + it.status} draggable
                   onDragStart={(e) => { e.stopPropagation(); setDragId(it.id); }} onDragEnd={() => setDragId(null)}
-                  onClick={() => setSel(it)} title={`${STATUS_LABEL[it.status]} · ${it.caption || ""}`}>
+                  onClick={(e) => { e.stopPropagation(); setSel(it); }} title={`${STATUS_LABEL[it.status]} · ${it.caption || ""}`}>
                   <span className="chip-time">{fmtTime(it.scheduled_at)}</span>
                   <span className="chip-txt">{showClient ? it.client : (it.caption?.slice(0, 30) || STATUS_LABEL[it.status])}</span>
                 </button>
@@ -130,12 +172,75 @@ export default function ContentCalendar({ items, onCreateOnDate, title, showClie
         })}
       </div>
 
-      {menu && (
-        <div className="cal-menu" style={{ top: menu.y, left: menu.x }} onClick={(e) => e.stopPropagation()}>
-          <button onClick={() => { onCreateOnDate(menu.key); setMenu(null); }}>+ New post on this day</button>
+      {/* ------- day action chooser ------- */}
+      {dayMenu && !noteForm && (
+        <div className="cal-modal" onClick={() => setDayMenu(null)}>
+          <div className="cal-modal-inner day-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="cal-x day-x" onClick={() => setDayMenu(null)}>×</button>
+            <div className="day-ico">🗓</div>
+            <h3 className="day-title">What would you like to do?</h3>
+            <div className="day-sub">For <b>{fmtDay(dayMenu.key)}</b></div>
+            <div className="day-cards">
+              <button className="day-card post" onClick={() => { onCreateOnDate(`${dayMenu.key}T09:00`); setDayMenu(null); }}>
+                <span className="day-card-ico blue">＋</span>
+                <span className="day-card-name">Create post</span>
+                <span className="day-card-desc">Compose and schedule a post for this date</span>
+              </button>
+              <button className="day-card note" onClick={() => { setNoteForm({ key: dayMenu.key, title: "", assignee: "", time: "09:00" }); setDayMenu(null); }}>
+                <span className="day-card-ico amber">📝</span>
+                <span className="day-card-name">Add note</span>
+                <span className="day-card-desc">A dated note or reminder — assign it to a teammate</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
+      {/* ------- note form ------- */}
+      {noteForm && (
+        <div className="cal-modal" onClick={() => setNoteForm(null)}>
+          <div className="cal-modal-inner day-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="cal-x day-x" onClick={() => setNoteForm(null)}>×</button>
+            <h3 className="day-title">Add a note</h3>
+            <div className="day-sub">{fmtDay(noteForm.key)}</div>
+            <div className="note-form">
+              <textarea rows={3} autoFocus value={noteForm.title} onChange={(e) => setNoteForm((f) => ({ ...f, title: e.target.value }))}
+                placeholder="e.g. Confirm fantasy-league picks link before this goes out…" />
+              <div className="note-form-row">
+                <select value={noteForm.assignee} onChange={(e) => setNoteForm((f) => ({ ...f, assignee: e.target.value }))}>
+                  <option value="">No assignee</option>
+                  {teamMembers.map((m) => <option key={m} value={m}>{m}</option>)}
+                </select>
+                <input type="time" value={noteForm.time} onChange={(e) => setNoteForm((f) => ({ ...f, time: e.target.value }))} />
+                <button className="cal-approve" disabled={busy === "note" || !noteForm.title.trim()} onClick={saveNote}>{busy === "note" ? "Saving…" : "Save note"}</button>
+              </div>
+              <div className="muted" style={{ fontSize: 11 }}>Notes surface in agency Notifications when due.</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ------- note detail ------- */}
+      {selNote && (
+        <div className="cal-modal" onClick={() => setSelNote(null)}>
+          <div className="cal-modal-inner day-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="cal-x day-x" onClick={() => setSelNote(null)}>×</button>
+            <h3 className="day-title">📝 Note</h3>
+            <div className="day-sub">{selNote.due_at ? new Date(selNote.due_at).toLocaleString() : ""}{showClient && selNote.client ? ` · ${selNote.client}` : ""}</div>
+            <div className="note-body">{selNote.title}</div>
+            <div className="note-meta">
+              {selNote.created_by && <span>Added by <b>{selNote.created_by}</b></span>}
+              {selNote.assigned_to && <span className="note-assignee">→ assigned to <b>{selNote.assigned_to}</b></span>}
+            </div>
+            <div className="cal-modal-actions">
+              <button className="cal-approve" disabled={busy === selNote.id + "dismiss"} onClick={() => noteOp(selNote.id, "dismiss")}>Mark done</button>
+              <button className="cal-reject" disabled={busy === selNote.id + "delete"} onClick={() => noteOp(selNote.id, "delete")}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ------- content item quick view ------- */}
       {sel && (
         <div className="cal-modal" onClick={() => setSel(null)}>
           <div className="cal-modal-inner" onClick={(e) => e.stopPropagation()}>

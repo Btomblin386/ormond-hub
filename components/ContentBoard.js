@@ -3,7 +3,7 @@ import { useState } from "react";
 import ContentManager from "./ContentManager";
 import ContentCalendar from "./ContentCalendar";
 
-export default function ContentBoard({ clientId, client, items, socials, editId }) {
+export default function ContentBoard({ clientId, client, items, socials, editId, notes = [], teamMembers = [] }) {
   const [composerOpen, setComposerOpen] = useState(false);
   const [seedDate, setSeedDate] = useState("");
   const calItems = items.map((it) => ({ ...it, client }));
@@ -23,8 +23,8 @@ export default function ContentBoard({ clientId, client, items, socials, editId 
 
       <div id="calendar" className="panel">
         <h2>Calendar</h2>
-        <p className="note">Scheduled and pending posts. Drag a post to reschedule, right-click a day to create one, or click an item to approve.</p>
-        <ContentCalendar items={calItems} onCreateOnDate={onCreateOnDate} title={client} />
+        <p className="note">Scheduled and pending posts. Click a day to create a post or add a note, drag a post to reschedule, or click an item to approve.</p>
+        <ContentCalendar items={calItems} notes={notes} teamMembers={teamMembers} clientId={clientId} onCreateOnDate={onCreateOnDate} title={client} />
       </div>
     </>
   );

@@ -615,3 +615,43 @@ tr:hover .row-rename { visibility: visible; }
 .task-result { font-size: 12.5px; color: #374151; white-space: pre-wrap; margin-top: 6px; border-left: 3px solid #c7d2fe; padding-left: 10px; }
 .task-actions { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
 .tag-pill { font-size: 10.5px; padding: 2px 7px; border-radius: 999px; background: #f3f4f6; color: #4b5563; margin-left: 4px; }
+
+/* ---------- Calendar day-action modal + notes (modernized) ---------- */
+.cal-cell.clickable-day { cursor: pointer; transition: border-color .12s, background .12s; }
+.cal-cell.clickable-day:hover { border-color: #c7d2fe; background: #fafaff; }
+.day-modal { max-width: 520px; text-align: center; position: relative; padding: 28px 26px 24px; }
+.day-x { position: absolute; top: 12px; right: 14px; }
+.day-ico { font-size: 30px; margin-bottom: 6px; }
+.day-title { margin: 0 0 4px; font-size: 19px; font-weight: 700; color: #111827; }
+.day-sub { font-size: 13px; color: #6b7280; margin-bottom: 18px; }
+.day-sub b { color: #4338ca; }
+.day-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.day-card { border-radius: 14px; padding: 20px 14px 16px; cursor: pointer; text-align: center; font: inherit;
+  display: flex; flex-direction: column; align-items: center; gap: 6px; transition: transform .12s, box-shadow .12s; }
+.day-card:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(15,20,32,.10); }
+.day-card.post { border: 1.5px solid #93c5fd; background: #eff6ff; }
+.day-card.note { border: 1.5px solid #fcd34d; background: #fffbeb; }
+.day-card-ico { width: 44px; height: 44px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 19px; }
+.day-card-ico.blue { background: #dbeafe; color: #1d4ed8; }
+.day-card-ico.amber { background: #fef3c7; }
+.day-card-name { font-size: 15px; font-weight: 700; color: #111827; }
+.day-card-desc { font-size: 12px; color: #6b7280; line-height: 1.45; }
+.note-form { text-align: left; }
+.note-form textarea { width: 100%; border: 1px solid #d1d5db; border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 13.5px; }
+.note-form textarea:focus, .note-form select:focus { outline: 2px solid #c7d2fe; border-color: #a5b4fc; }
+.note-form-row { display: flex; gap: 8px; margin: 10px 0 8px; flex-wrap: wrap; }
+.note-form-row select, .note-form-row input[type="time"] { border: 1px solid #d1d5db; border-radius: 8px; padding: 7px 10px; font: inherit; font-size: 13px; }
+.note-form-row select { flex: 1; min-width: 150px; }
+.cal-notechip { border: 1px solid #fcd34d; background: #fffbeb; color: #92400e; text-align: left; font-size: 10.5px; padding: 3px 6px; border-radius: 5px; cursor: pointer; display: flex; gap: 4px; align-items: center; overflow: hidden; }
+.cal-notechip .chip-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-body { text-align: left; font-size: 14px; color: #1f2937; background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; white-space: pre-wrap; }
+.note-meta { text-align: left; font-size: 12px; color: #6b7280; display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+.note-assignee b { color: #4338ca; }
+
+/* ---------- Assistant tab modernization ---------- */
+.assist-input { width: 100%; border: 1.5px solid #e5e7eb; border-radius: 14px; padding: 14px 16px; font: inherit; font-size: 14px; background: #fcfcfd; transition: border-color .12s, box-shadow .12s; }
+.assist-input:focus { outline: none; border-color: #a5b4fc; box-shadow: 0 0 0 3px rgba(99,102,241,.12); background: #fff; }
+.assist-run { border: 0; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; font-weight: 700; font-size: 13.5px; padding: 10px 22px; border-radius: 11px; cursor: pointer; margin-top: 10px; box-shadow: 0 4px 14px rgba(99,102,241,.30); transition: transform .12s, box-shadow .12s; }
+.assist-run:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(99,102,241,.38); }
+.assist-run:disabled { opacity: .55; cursor: default; box-shadow: none; }
+.task-row { box-shadow: 0 1px 4px rgba(15,20,32,.04); }

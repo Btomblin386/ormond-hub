@@ -54,10 +54,10 @@ export default function AssistantPanel({ clientId, client, tasks }) {
         <h2>Give the assistant a task</h2>
         <p className="note">It researches the web and works inside the hub for {client} — drafting posts onto the calendar (never publishing), setting reminders. Try:
           &nbsp;<i>&quot;Locate the national enduro schedule and draft fantasy-league posts two days before each round.&quot;</i></p>
-        <textarea rows={3} value={instructions} onChange={(e) => setInstructions(e.target.value)}
-          placeholder="Describe the job — it can look things up online and create dated drafts and reminders…" style={{ width: "100%" }} />
-        <button className="studio-btn" style={{ marginTop: 8 }} onClick={runTask} disabled={busy === "task" || !instructions.trim()}>
-          {busy === "task" ? "Queuing…" : "Run task"}
+        <textarea rows={3} className="assist-input" value={instructions} onChange={(e) => setInstructions(e.target.value)}
+          placeholder="Describe the job — it can look things up online and create dated drafts and reminders…" />
+        <button className="assist-run" onClick={runTask} disabled={busy === "task" || !instructions.trim()}>
+          {busy === "task" ? "Queuing…" : "✨ Run task"}
         </button>
 
         {aiTasks.length > 0 && (

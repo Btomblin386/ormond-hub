@@ -3,7 +3,7 @@ import AccountRow from "../components/AccountRow";
 import AccountTrends from "../components/AccountTrends";
 import NotificationsFeed from "../components/NotificationsFeed";
 import ContentCalendar from "../components/ContentCalendar";
-import { agencyTotals, accountsList, accountsTrendDaily, agencyNotifications, contentCalendar, lastFullDataDate } from "../lib/db";
+import { agencyTotals, accountsList, accountsTrendDaily, agencyNotifications, contentCalendar, lastFullDataDate, agencyNotes } from "../lib/db";
 import { money, num, roas, roasClass } from "../lib/format";
 import { getSession } from "../lib/session";
 
@@ -29,13 +29,14 @@ function Landing() {
 export default async function Overview({ searchParams }) {
   if (!getSession()) return <Landing />;
   const days = Number(searchParams?.days) || 30;
-  const [totals, trendRows, accounts, notifications, calendar, lastFull] = await Promise.all([
+  const [totals, trendRows, accounts, notifications, calendar, lastFull, notes] = await Promise.all([
     agencyTotals(days),
     accountsTrendDaily(16),
     accountsList(days),
     agencyNotifications(),
     contentCalendar(),
     lastFullDataDate(),
+    agencyNotes(),
   ]);
 
   const blended = roas(totals.revenue, totals.spend);
@@ -58,7 +59,7 @@ export default async function Overview({ searchParams }) {
       <div className="panel">
         <h2>Content calendar</h2>
         <p className="note">All accounts&apos; scheduled and pending content in one place. Click any item to approve or send back.</p>
-        <ContentCalendar items={calendar} showClient />
+        <ContentCalendar items={calendar} notes={notes} showClient />
       </div>
 
       <div className="cards">

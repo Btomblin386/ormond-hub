@@ -116,6 +116,14 @@ Also requested (not yet scheduled):
 - Push/email alerts for approvals + missed schedules (currently in-app notifications only).
 - Full top-nav conversion (OneUp-style) — layout is widened but nav still left-rail.
 
+## Recently shipped (2026-07-14, calendar notes + modal)
+- **Day-action modal** — left-click (or right-click) any day on an account's content calendar →
+  "Create post / Add note" chooser. Notes are `account_tasks` reminders with `created_by` (stamped
+  server-side from the session) and `assigned_to` (picked from app_users); shown as amber 📝 chips on
+  the calendar (account + agency views), click for detail with Mark done / Delete. Notes surface in
+  Notifications when due (existing reminders bucket).
+- **Assistant tab restyle** — modern input + gradient Run button; day modal styled per Brooks's mock.
+
 ## Recently shipped (2026-07-14, account assistant)
 - **Account Assistant tab** (agency-only) — free-text AI tasks per brand. New `account-task` edge fn runs
   Claude with server-side web_search + hub tools (create_draft → draft content_items on the calendar,
