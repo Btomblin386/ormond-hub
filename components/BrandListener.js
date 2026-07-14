@@ -18,10 +18,19 @@ export default function BrandListener({ clientId, sources, mentions, onRepurpose
   const [form, setForm] = useState({ kind: "rss", label: "", url: "", query: "", provider: "" });
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   function flash(t) { setMsg(t); setTimeout(() => setMsg(""), 6000); }
+  const hasMeta = sources.some((s) => s.kind === "meta");
 
   async function post(payload) {
     const r = await fetch("/api/brand-sources", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     return r.json();
+  }
+  async function connectMeta() {
+    setBusy("meta");
+    try {
+      const d = await post({ op: "add", clientId, kind: "meta", label: "Facebook + Instagram mentions" });
+      if (d.error) flash("Error: " + d.error);
+      else { await post({ op: "poll", clientId }); flash("Connected — pulling Facebook & Instagram mentions."); router.refresh(); }
+    } finally { setBusy(""); }
   }
   async function add() {
     if (form.kind === "rss" && !form.url) { flash("Add the feed URL."); return; }
@@ -50,9 +59,19 @@ export default function BrandListener({ clientId, sources, mentions, onRepurpose
           <button className="studio-btn" onClick={() => setOpen((o) => !o)}>{open ? "Cancel" : "+ Add source"}</button>
         </div>
       </div>
-      <p className="note">Mentions and tags for this brand, pulled from the sources you add. RSS works today (Google Alerts, Reddit search, YouTube, blogs). A social-listening API can be added once you connect a provider key.</p>
+      <p className="note">Mentions and tags for this brand — native Facebook + Instagram tags/posts, plus any RSS feeds you add (Google Alerts, Reddit, YouTube, blogs).</p>
 
       {msg && <div className="mng-msg">{msg}</div>}
+
+      {!hasMeta && (
+        <div className="meta-connect">
+          <div>
+            <b>Facebook + Instagram mentions</b>
+            <div className="muted" style={{ fontSize: 12 }}>Pull posts your Page is tagged in, visitor posts, and Instagram tags automatically.</div>
+          </div>
+          <button className="push-create" onClick={connectMeta} disabled={busy === "meta"}>{busy === "meta" ? "Connecting…" : "Connect"}</button>
+        </div>
+      )}
 
       {open && (
         <div className="rule-form">
