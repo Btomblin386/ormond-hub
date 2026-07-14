@@ -113,6 +113,7 @@ export default function AccountSettings({ acct, socials, ga4, brand, dropboxEmai
               <span className="social-ok">✓</span>
               <span className="set-conn-name">Connected</span>
               <span className="muted" style={{ fontSize: 11 }}>{dropboxEmail} · shared across the agency</span>
+              <a className="social-btn" style={{ textDecoration: "none", marginLeft: "auto" }} href="/api/oauth/dropbox/start">Reconnect</a>
             </div>
             <div className="set-row" style={{ marginTop: 8 }}>
               <label>Default folder for {acct.client}<div className="muted" style={{ fontSize: 10.5, fontWeight: 400 }}>the composer&apos;s Dropbox picker opens here</div></label>

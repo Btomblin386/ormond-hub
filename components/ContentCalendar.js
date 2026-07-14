@@ -181,7 +181,15 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
             <h3 className="day-title">What would you like to do?</h3>
             <div className="day-sub">For <b>{fmtDay(dayMenu.key)}</b></div>
             <div className="day-cards">
-              <button className="day-card post" onClick={() => { onCreateOnDate(`${dayMenu.key}T09:00`); setDayMenu(null); }}>
+              <button className="day-card post" onClick={() => {
+                // Today -> now+30m (9:00 AM would already be in the past); future days -> 9:00 AM
+                let seed = `${dayMenu.key}T09:00`;
+                if (dayMenu.key === todayKey) {
+                  const d = new Date(Date.now() + 30 * 60000 - new Date().getTimezoneOffset() * 60000);
+                  seed = d.toISOString().slice(0, 16);
+                }
+                onCreateOnDate(seed); setDayMenu(null);
+              }}>
                 <span className="day-card-ico blue">＋</span>
                 <span className="day-card-name">Create post</span>
                 <span className="day-card-desc">Compose and schedule a post for this date</span>
