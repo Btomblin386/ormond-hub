@@ -1,11 +1,21 @@
 import { NextResponse } from "next/server";
-import { setAccountCap, setAccountUrlParams } from "../../../lib/db";
+import { setAccountCap, setAccountUrlParams, renameClient } from "../../../lib/db";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req) {
   try {
     const body = await req.json();
+
+    // Rename a brand (clients.name is the display name across the hub; all
+    // data links by client_id, so renaming is safe).
+    if (body.clientId && typeof body.name === "string") {
+      const name = body.name.trim();
+      if (!name || name.length > 80) return NextResponse.json({ error: "name must be 1-80 characters" }, { status: 400 });
+      await renameClient(body.clientId, name);
+      return NextResponse.json({ ok: true, name });
+    }
+
     const { accountId } = body;
     if (!accountId) return NextResponse.json({ error: "missing accountId" }, { status: 400 });
 

@@ -15,6 +15,7 @@ export default function RepurposeStudio({ clientId, client, brand, seed, seedIma
   const [settings, setSettings] = useState({
     background_url: brand?.background_url || "", logo_url: brand?.logo_url || "",
     brand_color: brand?.brand_color || "#111827", brand_voice: brand?.brand_voice || "",
+    business_desc: brand?.business_desc || "",
   });
   const [ugc, setUgc] = useState("");
   const [busy, setBusy] = useState("");
@@ -152,6 +153,8 @@ export default function RepurposeStudio({ clientId, client, brand, seed, seedIma
               <input type="color" value={settings.brand_color} onChange={(e) => set("brand_color", e.target.value)} />
             </div>
           </div>
+          <label>What this business sells (guides ALL AI — chat, campaign plans, insights)</label>
+          <textarea rows={2} value={settings.business_desc} onChange={(e) => set("business_desc", e.target.value)} placeholder="e.g. an adventure-motorcycle luggage and soft-bag maker for long-distance riders" />
           <label>Brand voice (guides captions)</label>
           <textarea rows={2} value={settings.brand_voice} onChange={(e) => set("brand_voice", e.target.value)} placeholder="e.g. Rugged, rider-to-rider, no hype. Speaks to serious dirt-bike racers." />
           <button className="push-create" style={{ marginTop: 8 }} onClick={saveKit} disabled={busy === "kit"}>{busy === "kit" ? "Saving…" : "Save brand kit"}</button>

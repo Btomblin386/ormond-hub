@@ -1,16 +1,16 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ResponsiveContainer, LineChart, Line } from "recharts";
-import TrendChart from "./TrendChart";
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from "recharts";
 import { money, num, roas, roasClass } from "../lib/format";
 
 const pad = (n) => String(n).padStart(2, "0");
 const isoDay = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-function daysAgo(n) {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate() - n);
+const fromIso = (s) => new Date(s + "T00:00:00");
+function shiftDays(base, n) {
+  return new Date(base.getFullYear(), base.getMonth(), base.getDate() - n);
 }
+const fmtMoney = (n) => "$" + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
 
 function Delta({ cur, prev, goodUp }) {
   if (!(prev > 0)) return <span className="delta flat">—</span>;
@@ -24,19 +24,69 @@ function Delta({ cur, prev, goodUp }) {
   );
 }
 
+// Monday-start week bucket, so long ranges read as a weekly series
+function weekStart(dstr) {
+  const d = fromIso(dstr);
+  return isoDay(shiftDays(d, (d.getDay() + 6) % 7));
+}
+function bucketWeekly(rows) {
+  const m = new Map();
+  for (const r of rows) {
+    const k = weekStart(r.date);
+    const o = m.get(k) || { date: k, spend: 0, revenue: 0 };
+    o.spend += r.spend; o.revenue += r.revenue;
+    m.set(k, o);
+  }
+  return [...m.values()].sort((a, b) => (a.date < b.date ? -1 : 1));
+}
+// least-squares line over revenue
+function withTrend(rows) {
+  const n = rows.length;
+  if (n < 3) return rows;
+  const ys = rows.map((r) => r.revenue);
+  let sx = 0, sy = 0, sxx = 0, sxy = 0;
+  for (let i = 0; i < n; i++) { sx += i; sy += ys[i]; sxx += i * i; sxy += i * ys[i]; }
+  const denom = n * sxx - sx * sx;
+  if (!denom) return rows;
+  const slope = (n * sxy - sx * sy) / denom, icept = (sy - slope * sx) / n;
+  return rows.map((r, i) => ({ ...r, trend: Math.max(0, Math.round(slope * i + icept)) }));
+}
+
+function RangeChart({ data, weekly }) {
+  return (
+    <div style={{ height: 240 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
+          <CartesianGrid stroke="#f0f1f3" vertical={false} />
+          <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={28} tickFormatter={(d) => d.slice(5)} />
+          <YAxis tick={{ fontSize: 11 }} tickFormatter={fmtMoney} width={64} />
+          <Tooltip formatter={(v) => fmtMoney(v)} labelFormatter={(d) => (weekly ? "Week of " + d : d)} />
+          <Legend wrapperStyle={{ fontSize: 12 }} />
+          <Line type="monotone" dataKey="spend" name="Spend" stroke="#6366f1" strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="revenue" name="Revenue" stroke="#10b981" strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="trend" name="Revenue trend" stroke="#047857" strokeWidth={1.5} strokeDasharray="6 4" dot={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 /* ---------------- Quick-analytics modal ---------------- */
 const PRESETS = [7, 14, 30, 90];
 
-function QuickAnalytics({ account, onClose }) {
-  const [from, setFrom] = useState(isoDay(daysAgo(6)));
-  const [to, setTo] = useState(isoDay(daysAgo(0)));
+function QuickAnalytics({ account, endDate, onClose }) {
+  const end = endDate ? fromIso(endDate) : shiftDays(new Date(), 1);
+  const [from, setFrom] = useState(isoDay(shiftDays(end, 6)));
+  const [to, setTo] = useState(isoDay(end));
   const [active, setActive] = useState(7);
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [summary, setSummary] = useState("");
+  const [sumBusy, setSumBusy] = useState(false);
 
   async function load(f, t) {
-    setBusy(true); setErr("");
+    setBusy(true); setErr(""); setSummary("");
     try {
       const r = await fetch("/api/analytics", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -49,12 +99,32 @@ function QuickAnalytics({ account, onClose }) {
   useEffect(() => { load(from, to); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
   function preset(n) {
-    const f = isoDay(daysAgo(n - 1)), t = isoDay(daysAgo(0));
+    const f = isoDay(shiftDays(end, n - 1)), t = isoDay(end);
     setFrom(f); setTo(t); setActive(n); load(f, t);
   }
   function applyCustom() { setActive("custom"); load(from, to); }
 
   const t = data?.totals, p = data?.prev;
+  const spanDays = data ? Math.round((fromIso(to) - fromIso(from)) / 86400000) + 1 : 0;
+  const weekly = spanDays > 30;
+  const series = useMemo(() => {
+    if (!data) return [];
+    return withTrend(weekly ? bucketWeekly(data.trend) : data.trend);
+  }, [data, weekly]);
+
+  async function summarize() {
+    if (!data) return;
+    setSumBusy(true); setSummary("");
+    try {
+      const r = await fetch("/api/analytics-summary", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ client: account.client, from, to, totals: data.totals, prev: data.prev, prevRange: data.prevRange, trend: series.map(({ date, spend, revenue }) => ({ date, spend: Math.round(spend), revenue: Math.round(revenue) })) }),
+      });
+      const d = await r.json();
+      setSummary(d.summary || (d.error ? "Error: " + d.error : "No summary."));
+    } catch (e) { setSummary("Error: " + String(e)); } finally { setSumBusy(false); }
+  }
+
   const kpis = t && [
     { label: "Spend", value: money(t.spend), cur: t.spend, prev: p.spend, goodUp: null },
     { label: "Revenue", value: money(t.revenue), cur: t.revenue, prev: p.revenue, goodUp: true },
@@ -98,8 +168,15 @@ function QuickAnalytics({ account, onClose }) {
                 </div>
               ))}
             </div>
-            <div className="qa-prev">vs. previous period {data.prevRange.from} → {data.prevRange.to}{busy ? " · updating…" : ""}</div>
-            <TrendChart data={data.trend} />
+            <div className="qa-prev">
+              vs. previous period {data.prevRange.from} → {data.prevRange.to}
+              {weekly ? " · charted weekly" : ""}{busy ? " · updating…" : ""}
+            </div>
+            <div className="qa-sumrow">
+              <button className="rng" onClick={summarize} disabled={sumBusy}>{sumBusy ? "Summarizing…" : "✨ AI summary"}</button>
+            </div>
+            {summary && <div className="qa-sum">{summary}</div>}
+            <RangeChart data={series} weekly={weekly} />
           </>
         )}
       </div>
@@ -108,15 +185,16 @@ function QuickAnalytics({ account, onClose }) {
 }
 
 /* ---------------- Trend cards ---------------- */
-export default function AccountTrends({ accounts, trends }) {
+export default function AccountTrends({ accounts, trends, endDate }) {
   const [sel, setSel] = useState(null);
 
-  // last 14 calendar days, zero-filled so sparse data doesn't distort the line
+  // 14 full-data days ending endDate (last complete ingest day), zero-filled
   const dates = useMemo(() => {
+    const end = endDate ? fromIso(endDate) : shiftDays(new Date(), 1);
     const out = [];
-    for (let i = 13; i >= 0; i--) out.push(isoDay(daysAgo(i)));
+    for (let i = 13; i >= 0; i--) out.push(isoDay(shiftDays(end, i)));
     return out;
-  }, []);
+  }, [endDate]);
 
   const byClient = useMemo(() => {
     const m = {};
@@ -166,7 +244,7 @@ export default function AccountTrends({ accounts, trends }) {
           );
         })}
       </div>
-      {sel && <QuickAnalytics account={sel} onClose={() => setSel(null)} />}
+      {sel && <QuickAnalytics account={sel} endDate={endDate} onClose={() => setSel(null)} />}
     </>
   );
 }

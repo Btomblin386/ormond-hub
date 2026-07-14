@@ -569,3 +569,20 @@ a.mention-title:hover { color: #6366f1; }
 .qa-kpi .value { font-size: 16px; font-weight: 700; margin: 2px 0; }
 .qa-prev { font-size: 11px; color: #9ca3af; margin-bottom: 10px; }
 @media (max-width: 640px) { .qa-kpis { grid-template-columns: repeat(2, 1fr); } }
+
+/* ---------- Chat proposals + QA summary + rename ---------- */
+.chat-proposal { border: 1px solid #c7d2fe; background: #f5f7ff; border-radius: 10px; padding: 10px 12px; margin-top: 10px; }
+.prop-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.prop-flag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #4338ca; background: #e0e7ff; padding: 2px 7px; border-radius: 999px; }
+.prop-label { font-size: 13px; font-weight: 600; color: #111827; }
+.prop-details { margin: 0 0 8px; padding-left: 18px; font-size: 12.5px; color: #374151; }
+.prop-actions { display: flex; gap: 8px; }
+.prop-done { font-size: 12.5px; font-weight: 600; margin-bottom: 4px; }
+.prop-done.ok { color: #15803d; }
+.prop-done.err { color: #b91c1c; }
+.prop-note { font-size: 10.5px; color: #9ca3af; margin-top: 6px; }
+.qa-sumrow { margin-bottom: 8px; }
+.qa-sum { border: 1px solid #d1fae5; background: #f0fdf4; border-radius: 10px; padding: 10px 12px; font-size: 12.5px; color: #14532d; margin-bottom: 10px; line-height: 1.5; }
+.row-rename { border: 0; background: transparent; cursor: pointer; color: #9ca3af; font-size: 12px; margin-left: 6px; padding: 2px 4px; border-radius: 5px; visibility: hidden; }
+tr:hover .row-rename { visibility: visible; }
+.row-rename:hover { background: #eef2ff; color: #4338ca; }

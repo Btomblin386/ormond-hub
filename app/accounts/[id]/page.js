@@ -140,7 +140,7 @@ export default async function AccountDetail({ params, searchParams }) {
         </div>
       )}
 
-      <AccountChat client={acct.client} />
+      <AccountChat client={acct.client} accountExt={acct.external_account_id} accountId={acct.ad_account_id} />
 
       {store.length > 0 && (
         <div className="panel">

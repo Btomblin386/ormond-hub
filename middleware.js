@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 const PUBLIC = ["/login", "/api/login", "/privacy", "/terms", "/data-deletion"];
 
 // Paid-marketing APIs that creators/clients may not call
-const PAID_APIS = ["/api/manage", "/api/create", "/api/rules", "/api/account-settings", "/api/campaign-plan", "/api/audiences", "/api/pin", "/api/users", "/api/analytics"];
+const PAID_APIS = ["/api/manage", "/api/create", "/api/rules", "/api/account-settings", "/api/campaign-plan", "/api/audiences", "/api/pin", "/api/users", "/api/analytics", "/api/analytics-summary"];
 
 function b64urlFromBytes(bytes) {
   let bin = "";

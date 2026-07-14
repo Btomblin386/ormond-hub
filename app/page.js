@@ -3,19 +3,20 @@ import AccountRow from "../components/AccountRow";
 import AccountTrends from "../components/AccountTrends";
 import NotificationsFeed from "../components/NotificationsFeed";
 import ContentCalendar from "../components/ContentCalendar";
-import { agencyTotals, accountsList, accountsTrendDaily, agencyNotifications, contentCalendar } from "../lib/db";
+import { agencyTotals, accountsList, accountsTrendDaily, agencyNotifications, contentCalendar, lastFullDataDate } from "../lib/db";
 import { money, num, roas, roasClass } from "../lib/format";
 
 export const dynamic = "force-dynamic";
 
 export default async function Overview({ searchParams }) {
   const days = Number(searchParams?.days) || 30;
-  const [totals, trendRows, accounts, notifications, calendar] = await Promise.all([
+  const [totals, trendRows, accounts, notifications, calendar, lastFull] = await Promise.all([
     agencyTotals(days),
-    accountsTrendDaily(14),
+    accountsTrendDaily(16),
     accountsList(days),
     agencyNotifications(),
     contentCalendar(),
+    lastFullDataDate(),
   ]);
 
   const blended = roas(totals.revenue, totals.spend);
@@ -49,9 +50,9 @@ export default async function Overview({ searchParams }) {
       </div>
 
       <div className="panel">
-        <h2>Account trends · last 7 days</h2>
-        <p className="note">Spend (purple) &amp; revenue (green) per account vs. the prior 7 days. Click a card for quick analytics.</p>
-        <AccountTrends accounts={accounts.filter((a) => a.has_ads)} trends={trendRows} />
+        <h2>Account trends · last 7 full days</h2>
+        <p className="note">Spend (purple) &amp; revenue (green) per account vs. the prior 7 days{lastFull ? `, through ${lastFull} (last complete ingest day)` : ""}. Click a card for quick analytics.</p>
+        <AccountTrends accounts={accounts.filter((a) => a.has_ads)} trends={trendRows} endDate={lastFull} />
       </div>
 
       <div className="panel">

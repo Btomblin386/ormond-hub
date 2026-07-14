@@ -33,7 +33,11 @@ oauth_tokens (FB Login user tokens), app_users, user_profiles.
 ### Edge functions (SOURCE ONLY ON SUPABASE — download via `supabase functions download <name>`)
 - meta-ingest, meta-backfill, meta-discover-accounts — Meta ads data.
 - ga4-ingest, ga4-history — GA4 via service-account JWT.
-- generate-insights, account-chat, campaign-plan — AI (Anthropic).
+- generate-insights (v6), account-chat (v5), campaign-plan (v6) — AI (Anthropic). All three read the brand's
+  identity from `clients.brand_settings.business_desc` (+ brand_voice) — set per brand in the Repurpose Studio
+  brand kit; NEVER hardcode a vertical in these prompts. account-chat can emit a ```proposal``` JSON fence
+  (update_status / update_budget / create_campaign / set_url_params) that the hub renders as a confirm card.
+- analytics-summary — AI phrasing of a date-range's KPIs for the overview quick-analytics modal (stateless).
 - meta-create (v5), meta-manage (v2) — write campaigns/ads with guardrails + audit; applies account url_params.
 - meta-upload-image, meta-audiences.
 - content-upload — stores image (base64 or url) to `content-media` public bucket.
@@ -77,8 +81,12 @@ FB Login redirect URI to whitelist: `https://<prod-domain>/api/oauth/facebook/ca
   NotificationsFeed, TeamManager, OnboardClient. Media utils in `lib/media.js` (crop/upload-progress/video-validate).
 
 ## Pending backlog (in priority order chosen by Brooks)
-1. **Actionable Campaign Studio chat** — make the chat DO things (e.g. add UTM params to live campaigns) with
-   guardrails + approval, instead of only giving instructions. (NEXT)
+1. **Smart Insights for non-GA4 clients** — generate-insights only iterates clients present in
+   ga4_product_monthly (currently Slavens only), so every other brand has an empty Smart Insights tab and no
+   insight notifications. Build a daily_metrics-based signal path (campaign-level WoW/MoM trends) for clients
+   without GA4. (NEXT)
+2. **Fill in business_desc for every brand** (Brooks, in Listen & Create → brand kit) — until set, AI features
+   use a generic "ecommerce brand" framing.
 Also requested (not yet scheduled):
 - Repurpose Studio rework (fix brand-kit fit / black-bars, matching buttons; possible Canva integration later).
 - Dropbox integration (browse + pin a default folder per brand to grab photos).
@@ -86,6 +94,19 @@ Also requested (not yet scheduled):
 - Social insights tab (pin/enter starting stats + date, track over selectable periods).
 - Push/email alerts for approvals + missed schedules (currently in-app notifications only).
 - Full top-nav conversion (OneUp-style) — layout is widened but nav still left-rail.
+
+## Recently shipped (2026-07-14, later batch)
+- **Actionable account chat** — chat proposes changes as a card (pause/resume, budget w/ cap, create-paused
+  campaign, URL params) → Confirm & apply button → /api/manage (audit-logged) or /api/account-settings.
+  get_chat_context now includes campaign_id so proposals target real campaigns.
+- **Cross-brand AI contamination fix** — "dirt-bike retailer" was hardcoded in account-chat/campaign-plan/
+  generate-insights prompts (why Green Chile got Slavens-flavored plans). Now per-brand via
+  brand_settings.business_desc; new field in the brand kit UI; Slavens seeded.
+- **Quick analytics upgrades** — windows end at the last complete ingest day (no taper from today's partial
+  data; `lastFullDataDate()`); ranges >30d chart weekly; dashed revenue trend line; ✨ AI summary button
+  (analytics-summary edge fn, Haiku).
+- **Brand rename** — ✎ on the Accounts list rows (agency-only API in /api/account-settings; safe because all
+  data joins by client_id).
 
 ## Recently shipped (2026-07-14)
 - **Agency Overview redesign** — per-account 7d trend cards (sparkline + green/red deltas vs prior 7d,
