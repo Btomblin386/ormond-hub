@@ -313,7 +313,7 @@ function Composer({ clientId, socials, seedDate, editItem, onDone, dropbox, drop
             <input type="file" accept="image/*" multiple onChange={onFiles} disabled={uploading} />
             {dropbox && <button type="button" className="social-btn" onClick={() => setDbxOpen(true)}>📦 Add from Dropbox</button>}
           </div>
-          {dbxOpen && <DropboxPicker startPath={dropboxFolder || ""} onAdd={(url) => setMedia((m) => [...m, url])} onClose={() => setDbxOpen(false)} />}
+          {dbxOpen && <DropboxPicker clientId={clientId} startPath={dropboxFolder || ""} onAdd={(url) => setMedia((m) => [...m, url])} onClose={() => setDbxOpen(false)} />}
           {Object.entries(progress).map(([name, pct]) => (
             <div key={name} className="upl-prog">
               <div className="upl-bar"><div className="upl-fill" style={{ width: pct + "%" }} /></div>

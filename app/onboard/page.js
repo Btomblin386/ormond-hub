@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import Shell from "../../components/Shell";
 import OnboardClient from "../../components/OnboardClient";
 import OnboardGoogle from "../../components/OnboardGoogle";
-import { clientsList } from "../../lib/db";
+import { clientsList, dropboxAccount } from "../../lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +43,7 @@ export default async function Onboard({ searchParams }) {
   }
 
   const clients = await clientsList();
+  const dbx = await dropboxAccount().catch(() => null);
 
   return (
     <Shell crumb={<><b>Onboarding</b> · connect accounts</>}>
@@ -80,6 +81,18 @@ export default async function Onboard({ searchParams }) {
       ) : (
         <OnboardGoogle properties={gProps || []} clients={clients} email={gEmail} />
       )}
+
+      <div className="panel">
+        <h2>Dropbox</h2>
+        {dbx ? (
+          <p className="note"><span className="social-ok">✓ Connected</span> — {dbx.account_email}. Set each brand&apos;s default folder from the composer&apos;s Dropbox picker or the brand&apos;s Settings tab.</p>
+        ) : (
+          <>
+            <p className="note">One agency-wide connection powers &quot;Add from Dropbox&quot; in every brand&apos;s composer.</p>
+            <a className="cmp-btn solid" style={{ display: "inline-block", textDecoration: "none" }} href="/api/oauth/dropbox/start">Connect Dropbox</a>
+          </>
+        )}
+      </div>
     </Shell>
   );
 }

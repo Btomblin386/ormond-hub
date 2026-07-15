@@ -116,6 +116,16 @@ Also requested (not yet scheduled):
 - Push/email alerts for approvals + missed schedules (currently in-app notifications only).
 - Full top-nav conversion (OneUp-style) — layout is widened but nav still left-rail.
 
+## Recently shipped (2026-07-15, global Settings + Dropbox thumbnails)
+- **Global /settings page** (agency-only; replaces "Team & access" in the nav, /team still routes):
+  Connections (FB Pages count, Google/GA4, Dropbox with connect/reconnect), Platform credentials
+  checklist (booleans from the new config-status edge fn — values never leave Supabase/Vercel; self-serve
+  key editor deferred to the multi-tenant version), Team & access embedded.
+- **Dropbox picker v2** — thumbnail grid (files/get_thumbnail_batch, ≤100 per folder, data URIs),
+  folder chips, "Set as default" saves brand_settings.dropbox_folder from inside the picker
+  (brand-settings API now supports `merge` — mergeBrandSettings jsonb ||). Business team space browsed
+  via Dropbox-API-Path-Root (auto-detected, cached on the token row). Onboard page gained a Dropbox panel.
+
 ## Recently shipped (2026-07-14, Dropbox + bulk + crash fix)
 - **Dropbox** — agency-wide connection (oauth-dropbox edge fn; oauth_tokens provider 'dropbox';
   secrets DROPBOX_APP_KEY/SECRET + Vercel env DROPBOX_APP_KEY). Composer gains "Add from Dropbox":

@@ -80,6 +80,8 @@ export async function middleware(req) {
       pathname === "/" ||
       pathname.startsWith("/reconciliation") ||
       pathname.startsWith("/onboard") ||
+      pathname.startsWith("/settings") ||
+      pathname.startsWith("/team") ||
       /^\/accounts\/[^/]+$/.test(pathname) ||        // paid-marketing account root
       /^\/accounts\/[^/]+\/google/.test(pathname) ||    // google analytics/ads tab
       /^\/accounts\/[^/]+\/settings/.test(pathname) ||  // account settings
