@@ -120,6 +120,14 @@ Also requested (not yet scheduled):
 - Push/email alerts for approvals + missed schedules (currently in-app notifications only).
 - Full top-nav conversion (OneUp-style) — layout is widened but nav still left-rail.
 
+## Recently shipped (2026-07-15, Dropbox folder restrictions)
+- **Owner-level Dropbox folder visibility** — Settings → Dropbox → "Manage folder visibility": tick
+  Hidden on any folder (personal space, sensitive client folders) and it — plus everything inside —
+  disappears from every brand's picker. Enforced in oauth-dropbox v7 (not just UI): hidden prefixes are
+  filtered from listings, direct path listing refuses, get_temporary_link refuses. List stored in new
+  `app_settings` table (key 'dropbox_hidden_paths'). Admin flag + set_hidden are agency-gated in
+  /api/dropbox (creators still browse the filtered view).
+
 ## Recently shipped (2026-07-15, assistant curation powers)
 - **Assistant can now see and (with confirmation) delete posts.** Runner v3 tools: list_posts
   (read-only) and propose_deletions — proposals are stored on the task (`account_tasks.proposal`

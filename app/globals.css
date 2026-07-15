@@ -722,3 +722,8 @@ video.mention-media { max-width: 240px; border-radius: 8px; }
 .prop-box-head { font-weight: 600; color: #111827; }
 .prop-box.undone .prop-box-head, .prop-box.rejected .prop-box-head { color: #6b7280; font-weight: 500; }
 .prop-box .prop-details { margin: 6px 0 0; padding-left: 18px; color: #374151; }
+
+/* ---------- Dropbox folder visibility ---------- */
+.dbx-vis { border: 1px solid #eef0f2; border-radius: 10px; padding: 10px 12px; margin-top: 10px; background: #fcfcfd; }
+.dbx-hiddenrow { opacity: .55; }
+.dbx-hiddenrow .dbx-folder { text-decoration: line-through; }

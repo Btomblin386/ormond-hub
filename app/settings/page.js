@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Shell from "../../components/Shell";
 import TeamManager from "../../components/TeamManager";
+import DropboxFolderControl from "../../components/DropboxFolderControl";
 import { getSession } from "../../lib/session";
 import { listUsers, clientsList, connectionsOverview } from "../../lib/db";
 
@@ -65,6 +66,7 @@ export default async function SettingsPage() {
           <span className="muted" style={{ fontSize: 12 }}>{conn?.dropbox_email ? `${conn.dropbox_email} · set each brand's default folder in its Settings tab or from the picker` : "not connected"}</span>
           <a className="social-btn" style={{ marginLeft: "auto", textDecoration: "none" }} href="/api/oauth/dropbox/start">{conn?.dropbox_email ? "Reconnect" : "Connect Dropbox"}</a>
         </div>
+        {conn?.dropbox_email && <DropboxFolderControl />}
       </div>
 
       <div className="panel">
