@@ -182,7 +182,16 @@ function Mention({ clientId, m, onRepurpose }) {
   return (
     <div className="mention">
       <span className={"sent " + (m.sentiment || "neutral")} />
-      {m.media_url && <img className="mention-media" src={m.media_url} alt="" />}
+      {m.media_kind === "video" && m.media_url ? (
+        <video className="mention-media" src={m.media_url} controls muted playsInline poster={m.media_urls?.[0] || undefined} />
+      ) : Array.isArray(m.media_urls) && m.media_urls.length > 1 ? (
+        <div className="mention-strip">
+          {m.media_urls.slice(0, 5).map((u, i) => <img key={i} className="mention-media" src={u} alt="" />)}
+          {m.media_urls.length > 5 && <span className="cal-more">+{m.media_urls.length - 5}</span>}
+        </div>
+      ) : m.media_url ? (
+        <img className="mention-media" src={m.media_url} alt="" />
+      ) : null}
       <div className="mention-body">
         <div className="mention-top">
           {m.url ? <a href={m.url} target="_blank" rel="noreferrer" className="mention-title">{m.title}</a> : <span className="mention-title">{m.title}</span>}

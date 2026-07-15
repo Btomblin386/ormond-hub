@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -10,8 +10,15 @@ async function post(body) {
   return r.json();
 }
 
-export default function AssistantPanel({ clientId, client, tasks }) {
+export default function AssistantPanel({ clientId, client, tasks, agency }) {
   const router = useRouter();
+  // Live-update while anything is queued/running, so completion shows without a manual reload.
+  const active = tasks.some((t) => t.kind === "task" && (t.status === "queued" || t.status === "running"));
+  useEffect(() => {
+    if (!active) return;
+    const iv = setInterval(() => router.refresh(), 5000);
+    return () => clearInterval(iv);
+  }, [active, router]);
   const [instructions, setInstructions] = useState("");
   const [remTitle, setRemTitle] = useState("");
   const [remDate, setRemDate] = useState("");
@@ -27,9 +34,9 @@ export default function AssistantPanel({ clientId, client, tasks }) {
     if (!text) return;
     setBusy("task");
     try {
-      const d = await post({ op: "create", clientId, kind: "task", title: text.slice(0, 120), instructions: text });
+      const d = await post({ op: "create", clientId: clientId || null, kind: "task", title: text.slice(0, 120), instructions: text });
       if (d.error) flash("Error: " + d.error);
-      else { setInstructions(""); flash("Task queued — the assistant is on it. Results land here and in Notifications (usually 1–2 minutes)."); router.refresh(); }
+      else { setInstructions(""); flash("Task started — this page updates live as it runs."); router.refresh(); }
     } finally { setBusy(""); }
   }
   async function addReminder() {
@@ -52,8 +59,10 @@ export default function AssistantPanel({ clientId, client, tasks }) {
 
       <div className="panel">
         <h2>Give the assistant a task</h2>
-        <p className="note">It researches the web and works inside the hub for {client} — drafting posts onto the calendar (never publishing), setting reminders. Try:
-          &nbsp;<i>&quot;Locate the national enduro schedule and draft fantasy-league posts two days before each round.&quot;</i></p>
+        <p className="note">It researches the web and works inside the hub {agency ? "across every brand" : `for ${client}`} — drafting posts onto the calendar (never publishing), setting reminders. Try:
+          &nbsp;<i>{agency
+            ? "“Draft holiday-closure reminder posts for all brands before each remaining federal holiday, excluding Columbus Day.”"
+            : "“Locate the national enduro schedule and draft fantasy-league posts two days before each round.”"}</i></p>
         <textarea rows={3} className="assist-input" value={instructions} onChange={(e) => setInstructions(e.target.value)}
           placeholder="Describe the job — it can look things up online and create dated drafts and reminders…" />
         <button className="assist-run" onClick={runTask} disabled={busy === "task" || !instructions.trim()}>
@@ -72,7 +81,8 @@ export default function AssistantPanel({ clientId, client, tasks }) {
                 {t.result && <div className="task-result">{t.result}</div>}
                 {t.error && <div className="push-err">{t.error}</div>}
                 <div className="task-actions">
-                  {t.status === "done" && <Link href={`/accounts/${clientId}/content`} className="rowlink">View drafts →</Link>}
+                  {t.status === "done" && !agency && <Link href={`/accounts/${clientId}/content`} className="rowlink">View drafts →</Link>}
+                  {t.status === "done" && agency && <Link href="/" className="rowlink">View calendar →</Link>}
                   {t.status === "failed" && <button className="social-btn" disabled={busy === t.id + "run"} onClick={() => act(t.id, "run")}>Retry</button>}
                   <button className="rule-del" disabled={busy === t.id + "delete"} onClick={() => act(t.id, "delete")}>Remove</button>
                 </div>
@@ -82,6 +92,7 @@ export default function AssistantPanel({ clientId, client, tasks }) {
         )}
       </div>
 
+      {agency ? null : (
       <div className="panel">
         <h2>Reminders</h2>
         <p className="note">Dated notes about this brand — they surface in agency Notifications when due. The assistant can also set these for you.</p>
@@ -101,6 +112,7 @@ export default function AssistantPanel({ clientId, client, tasks }) {
             </div>
           ))}
       </div>
+      )}
     </>
   );
 }

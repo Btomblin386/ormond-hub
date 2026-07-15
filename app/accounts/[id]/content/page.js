@@ -32,7 +32,7 @@ export default async function AccountContent({ params, searchParams }) {
       <AccountTabs accountId={acct.id} active="content" role={role} />
 
       <ContentBoard clientId={acct.client_id} client={acct.client} items={items} socials={socials} editId={searchParams?.edit || null} notes={notes} teamMembers={teamMembers}
-        dropbox={!!dbx} dropboxFolder={brand?.dropbox_folder || ""} />
+        dropbox={!!dbx} dropboxFolder={brand?.dropbox_folder || ""} brandLogo={brand?.logo_url || null} />
     </Shell>
   );
 }

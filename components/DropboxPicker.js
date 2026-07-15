@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 // Browse the agency Dropbox with real thumbnails and import selected images
 // into the content-media bucket (Dropbox temporary links expire, so files are
 // copied on import). Any folder can be saved as the brand's default.
-export default function DropboxPicker({ clientId, startPath, onAdd, onClose }) {
+export default function DropboxPicker({ clientId, startPath, onAdd, onClose, onDefaultSaved }) {
   const [path, setPath] = useState(startPath || "");
   const [entries, setEntries] = useState(null);
   const [err, setErr] = useState("");
@@ -51,7 +51,7 @@ export default function DropboxPicker({ clientId, startPath, onAdd, onClose }) {
     try {
       const r = await fetch("/api/brand-settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId, merge: { dropbox_folder: path || "" } }) });
       const d = await r.json();
-      if (!d.error) setDefaultPath(path);
+      if (!d.error) { setDefaultPath(path); onDefaultSaved?.(path); }
     } finally { setBusy(""); }
   }
 

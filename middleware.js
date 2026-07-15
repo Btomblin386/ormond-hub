@@ -82,6 +82,7 @@ export async function middleware(req) {
       pathname.startsWith("/onboard") ||
       pathname.startsWith("/settings") ||
       pathname.startsWith("/team") ||
+      pathname === "/assistant" ||
       /^\/accounts\/[^/]+$/.test(pathname) ||        // paid-marketing account root
       /^\/accounts\/[^/]+\/google/.test(pathname) ||    // google analytics/ads tab
       /^\/accounts\/[^/]+\/settings/.test(pathname) ||  // account settings

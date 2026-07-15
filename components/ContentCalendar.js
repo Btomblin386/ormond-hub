@@ -25,6 +25,9 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
   const [selNote, setSelNote] = useState(null);
   const [dayMenu, setDayMenu] = useState(null);   // { key } -> action chooser
   const [noteForm, setNoteForm] = useState(null); // { key, title, assignee, time }
+  const [daySheet, setDaySheet] = useState(null); // { key } -> bulk day view (agency calendar)
+  const [dayChecked, setDayChecked] = useState([]);
+  const [moveTo, setMoveTo] = useState("");
   const [busy, setBusy] = useState("");
   const [dragId, setDragId] = useState(null);
   const [overKey, setOverKey] = useState(null);
@@ -81,8 +84,30 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
   }
 
   function openDayMenu(key) {
-    if (!onCreateOnDate || dragId) return; // agency calendar: display-only days
-    setDayMenu({ key });
+    if (dragId) return;
+    if (onCreateOnDate) { setDayMenu({ key }); return; }
+    // Agency calendar: clicking a day opens the bulk sheet for that day's posts
+    const dayItems = byDate[key] || [];
+    if (dayItems.length) { setDaySheet({ key }); setDayChecked(dayItems.filter((i) => i.status !== "published" && i.status !== "publishing").map((i) => i.id)); setMoveTo(""); }
+  }
+  async function bulkDay(action) {
+    if (!dayChecked.length) return;
+    if (action === "delete" && !window.confirm(`Delete ${dayChecked.length} post(s)?`)) return;
+    setBusy("sheet");
+    try {
+      for (const id of dayChecked) {
+        if (action === "approve") await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "status", id, status: "approved", approvedBy: "agency" }) });
+        else if (action === "delete") await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "delete", id }) });
+        else if (action === "move" && moveTo) {
+          const it = items.find((x) => x.id === id);
+          const prev = it?.scheduled_at ? new Date(it.scheduled_at) : null;
+          const hh = prev ? prev.getHours() : 9, mm = prev ? prev.getMinutes() : 0;
+          const d = new Date(`${moveTo}T00:00:00`); d.setHours(hh, mm);
+          await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "reschedule", id, scheduledAt: d.toISOString() }) });
+        }
+      }
+      setDaySheet(null); router.refresh();
+    } finally { setBusy(""); }
   }
   async function saveNote() {
     if (!noteForm?.title?.trim()) return;
@@ -144,7 +169,7 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
           const dayNotes = notesByDate[key] || [];
           return (
             <div key={i}
-              className={"cal-cell" + (key === todayKey ? " today" : "") + (overKey === key ? " dragover" : "") + (onCreateOnDate ? " clickable-day" : "")}
+              className={"cal-cell" + (key === todayKey ? " today" : "") + (overKey === key ? " dragover" : "") + (onCreateOnDate || dayItems.length ? " clickable-day" : "")}
               onClick={() => openDayMenu(key)}
               onDragOver={(e) => { if (dragId) { e.preventDefault(); setOverKey(key); } }}
               onDragLeave={() => setOverKey((k) => (k === key ? null : k))}
@@ -228,6 +253,43 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
         </div>
       )}
 
+      {/* ------- agency day sheet: bulk approve / move / delete ------- */}
+      {daySheet && (
+        <div className="cal-modal" onClick={() => setDaySheet(null)}>
+          <div className="cal-modal-inner day-modal dbx-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="cal-x day-x" onClick={() => setDaySheet(null)}>×</button>
+            <h3 className="day-title">{fmtDay(daySheet.key)}</h3>
+            <div className="day-sub">{(byDate[daySheet.key] || []).length} post(s) · select and act on them together</div>
+            <div className="sheet-list">
+              {(byDate[daySheet.key] || []).map((it) => {
+                const locked = it.status === "published" || it.status === "publishing";
+                return (
+                  <label key={it.id} className={"sheet-row" + (locked ? " locked" : "")}>
+                    <input type="checkbox" disabled={locked} checked={dayChecked.includes(it.id)}
+                      onChange={() => setDayChecked((c) => c.includes(it.id) ? c.filter((x) => x !== it.id) : [...c, it.id])} />
+                    <span className={"cbadge " + it.status}>{STATUS_LABEL[it.status]}</span>
+                    {showClient && <b style={{ fontSize: 12 }}>{it.client}</b>}
+                    <span className="sheet-cap">{fmtTime(it.scheduled_at)} · {it.caption?.slice(0, 60) || "(no caption)"}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <div className="sheet-actions">
+              <label className="bulk-all" style={{ marginRight: "auto" }}>
+                <input type="checkbox"
+                  checked={dayChecked.length > 0}
+                  onChange={(e) => setDayChecked(e.target.checked ? (byDate[daySheet.key] || []).filter((i) => i.status !== "published" && i.status !== "publishing").map((i) => i.id) : [])} />
+                {dayChecked.length} selected
+              </label>
+              <button className="cal-approve" disabled={busy === "sheet" || !dayChecked.length} onClick={() => bulkDay("approve")}>Approve</button>
+              <input type="date" value={moveTo} onChange={(e) => setMoveTo(e.target.value)} style={{ border: "1px solid #d1d5db", borderRadius: 8, padding: "5px 8px", fontSize: 12 }} />
+              <button className="cal-reject" disabled={busy === "sheet" || !dayChecked.length || !moveTo} onClick={() => bulkDay("move")}>Move</button>
+              <button className="rule-del" disabled={busy === "sheet" || !dayChecked.length} onClick={() => bulkDay("delete")}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ------- note detail ------- */}
       {selNote && (
         <div className="cal-modal" onClick={() => setSelNote(null)}>
@@ -282,6 +344,13 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
               {(sel.status === "draft" || sel.status === "needs_revisions") && <button className="cal-reject" onClick={() => act(sel.id, "needs_approval")}>Submit for approval</button>}
               {["draft", "needs_approval", "needs_revisions"].includes(sel.status) && <button className="cal-approve" onClick={() => act(sel.id, "approved")}>Approve &amp; schedule</button>}
               {["needs_approval", "approved", "scheduled"].includes(sel.status) && <button className="cal-reject" onClick={() => act(sel.id, "draft")}>Send back to draft</button>}
+              {sel.status !== "published" && sel.status !== "publishing" && (
+                <button className="rule-del" disabled={busy === "del"} onClick={async () => {
+                  if (!window.confirm("Delete this post?")) return;
+                  setBusy("del");
+                  try { await post("delete", { id: sel.id }); setSel(null); } finally { setBusy(""); }
+                }}>Delete</button>
+              )}
             </div>
           </div>
         </div>

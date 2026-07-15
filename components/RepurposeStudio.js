@@ -20,6 +20,7 @@ export default function RepurposeStudio({ clientId, client, brand, seed, seedIma
   const [ugc, setUgc] = useState("");
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
+  const [lastDraftId, setLastDraftId] = useState(null);
   const [kitOpen, setKitOpen] = useState(false);
   const [text, setText] = useState(seed || "");
   const [variants, setVariants] = useState([]);
@@ -103,7 +104,8 @@ export default function RepurposeStudio({ clientId, client, brand, seed, seedIma
       const r = await fetch("/api/repurpose", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ client, source_text: text, brand_voice: settings.brand_voice }) });
       const d = await r.json();
       if (d.error) flash("Error: " + d.error);
-      else { setVariants(d.variants || []); if (d.variants?.[0]) setCaption(d.variants[0].caption); }
+      else if (!d.variants?.length) flash("The caption model came back empty — try Generate again.");
+      else { setVariants(d.variants); setCaption(d.variants[0].caption); }
     } finally { setBusy(""); }
   }
 
@@ -125,7 +127,7 @@ export default function RepurposeStudio({ clientId, client, brand, seed, seedIma
       });
       const d = await r.json();
       if (d.error) flash("Error: " + d.error);
-      else { flash("Draft created — find it under Posts / Calendar."); router.refresh(); }
+      else { setLastDraftId(d.id || null); flash("Draft created."); router.refresh(); }
     } finally { setBusy(""); }
   }
 
@@ -187,6 +189,11 @@ export default function RepurposeStudio({ clientId, client, brand, seed, seedIma
             <button className="cmp-btn ghost" onClick={() => createDraft(false)} disabled={!!busy}>{busy === "asis" ? "Saving…" : "Post image as-is"}</button>
           </div>
           <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>Branded = UGC on your brand background. As-is = the original image, untouched.</div>
+          {lastDraftId && (
+            <a className="rowlink" style={{ display: "inline-block", marginTop: 8, fontWeight: 700 }} href={`/accounts/${clientId}/content?edit=${lastDraftId}`}>
+              Open the new draft in the composer →
+            </a>
+          )}
         </div>
         <div className="rep-right">
           <canvas ref={canvasRef} className="rep-canvas" />

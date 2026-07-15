@@ -116,6 +116,32 @@ Also requested (not yet scheduled):
 - Push/email alerts for approvals + missed schedules (currently in-app notifications only).
 - Full top-nav conversion (OneUp-style) — layout is widened but nav still left-rail.
 
+## Recently shipped (2026-07-15, big fix/feature batch)
+- **CRITICAL jsonb fix** — postgres.js infers param types from `::jsonb` casts, so every
+  `${JSON.stringify(x)}::jsonb` write stored a jsonb STRING (and `||` merges built arrays). Broke:
+  composer edit (variants "{}" → phantom customize mode hiding captions), brand-settings saves
+  (dropbox_folder/business_desc unreadable). Fixed with `sql.json()` everywhere + data repairs
+  (FunnelWeb brand_settings rebuilt with its dropbox folder). RULE: never JSON.stringify into jsonb —
+  use sql.json().
+- **Assistant v2** — instant start: /api/tasks calls account-task directly with {background:true}
+  (202 + EdgeRuntime.waitUntil; the old pg_net trigger from Vercel never fired — tasks waited for the
+  */10 cron). Honest results: always appends "Actually created: N drafts, M reminders" + flags failed
+  tool calls. Assistant pages auto-refresh every 5s while a task runs. **Agency-level assistant** at
+  /assistant (nav): client_id-null tasks get the brand roster and file drafts/reminders per brand via
+  a for_client tool param.
+- **Image editor** (components/ImageEditor.js) — replaces the composer crop dropdown: ✎ on any thumbnail
+  → live canvas preview, drag-to-reframe + zoom, ratio presets, crop-to-fill vs fit+background
+  (blur/color), 6 filters, brand-logo watermark (brand kit logo_url) with corner choice; exports 1080px
+  JPEG to content-media. Candidate to replace Repurpose Studio's canvas compositor later.
+- **Composer**: drag & drop image upload; Dropbox picker default-folder now updates in-session too.
+- **Calendars**: item quick-modal gained Delete; agency calendar day-click opens a bulk sheet
+  (select all on that day → Approve / Move to date / Delete).
+- **Repurpose**: caption model output parsed across ALL text blocks (single-block parse silently
+  returned zero variants — looked like "generate not working" and "@/# stripped"); empty results now
+  error loudly; "Open the new draft in the composer →" link after drafting.
+- **Listener media**: mention_items gains media_urls[] + media_kind; brand-listen v13 pulls carousel
+  children and keeps playable video URLs; BrandListener renders carousel strips + <video> for reels.
+
 ## Recently shipped (2026-07-15, global Settings + Dropbox thumbnails)
 - **Global /settings page** (agency-only; replaces "Team & access" in the nav, /team still routes):
   Connections (FB Pages count, Google/GA4, Dropbox with connect/reconnect), Platform credentials

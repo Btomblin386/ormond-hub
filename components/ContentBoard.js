@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import ContentManager from "./ContentManager";
 import ContentCalendar from "./ContentCalendar";
 
-export default function ContentBoard({ clientId, client, items, socials, editId, notes = [], teamMembers = [], dropbox, dropboxFolder }) {
+export default function ContentBoard({ clientId, client, items, socials, editId, notes = [], teamMembers = [], dropbox, dropboxFolder, brandLogo }) {
   const [composerOpen, setComposerOpen] = useState(false);
   const [seedDate, setSeedDate] = useState("");
 
@@ -23,7 +23,7 @@ export default function ContentBoard({ clientId, client, items, socials, editId,
       <div id="posts">
         <ContentManager clientId={clientId} client={client} items={items} socials={socials}
           open={composerOpen} setOpen={setComposerOpen} seedDate={seedDate} editId={editId}
-          dropbox={dropbox} dropboxFolder={dropboxFolder} />
+          dropbox={dropbox} dropboxFolder={dropboxFolder} brandLogo={brandLogo} />
       </div>
 
       <div id="calendar" className="panel">

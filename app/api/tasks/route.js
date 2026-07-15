@@ -1,16 +1,25 @@
 import { NextResponse } from "next/server";
-import { createTask, setTaskStatus, deleteTask, triggerTaskRunner } from "../../../lib/db";
+import { createTask, setTaskStatus, deleteTask } from "../../../lib/db";
 import { getSession } from "../../../lib/session";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
+const FN_URL = "https://jxlrnuyfracyygiksqdj.supabase.co/functions/v1/account-task";
 const ANON =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4bHJudXlmcmFjeXlnaWtzcWRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MjQ1OTUsImV4cCI6MjA5MDIwMDU5NX0.std1mTdOV4bU4S7wygQ67NdganwPrI6b2HFBi1BXQJ8";
 
-// Fire the runner without blocking the response; the cron sweep is the fallback
-// (and local dev, which has no pg_net, relies on it entirely).
-async function tryTrigger(taskId) {
-  try { await triggerTaskRunner(taskId, ANON); } catch { /* cron picks it up */ }
+// Kick the runner directly: it responds 202 immediately and processes in the
+// background (EdgeRuntime.waitUntil), so tasks start within seconds. The
+// */10 cron sweep remains the safety net.
+async function trigger(taskId) {
+  try {
+    await fetch(FN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON}` },
+      body: JSON.stringify({ task_id: taskId, background: true }),
+    });
+  } catch { /* cron picks it up */ }
 }
 
 export async function POST(req) {
@@ -19,17 +28,17 @@ export async function POST(req) {
     const op = b.op;
 
     if (op === "create") {
-      if (!b.clientId || !b.title?.trim()) return NextResponse.json({ error: "missing clientId/title" }, { status: 400 });
+      if (!b.title?.trim()) return NextResponse.json({ error: "missing title" }, { status: 400 });
       const kind = b.kind === "reminder" ? "reminder" : "task";
-      if (kind === "reminder" && !b.dueAt) return NextResponse.json({ error: "reminders need a date" }, { status: 400 });
+      if (kind === "reminder" && (!b.clientId || !b.dueAt)) return NextResponse.json({ error: "reminders need a brand and a date" }, { status: 400 });
       const createdBy = getSession()?.name || "Agency";
-      const [row] = await createTask({ clientId: b.clientId, kind, title: b.title.trim(), instructions: b.instructions?.trim() || null, dueAt: b.dueAt || null, createdBy, assignedTo: b.assignedTo?.trim() || null });
-      if (kind === "task") await tryTrigger(row.id);
+      const [row] = await createTask({ clientId: b.clientId || null, kind, title: b.title.trim(), instructions: b.instructions?.trim() || null, dueAt: b.dueAt || null, createdBy, assignedTo: b.assignedTo?.trim() || null });
+      if (kind === "task") await trigger(row.id);
       return NextResponse.json({ ok: true, id: row.id });
     }
     if (op === "run") {
       await setTaskStatus(b.id, { status: "queued" });
-      await tryTrigger(b.id);
+      await trigger(b.id);
       return NextResponse.json({ ok: true });
     }
     if (op === "dismiss") {

@@ -2,8 +2,9 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { fileToB64, cropToRatio, uploadImage, imageSize, IG_RATIOS, IG_FEED_MIN, IG_FEED_MAX, videoMeta, validateReel } from "../lib/media";
+import { fileToB64, uploadImage, imageSize, IG_FEED_MIN, IG_FEED_MAX, videoMeta, validateReel } from "../lib/media";
 import DropboxPicker from "./DropboxPicker";
+import ImageEditor from "./ImageEditor";
 
 const STATUS_LABEL = {
   draft: "Draft", needs_approval: "Needs approval", needs_revisions: "Needs revisions", approved: "Approved",
@@ -12,7 +13,6 @@ const STATUS_LABEL = {
 const LIMITS = { instagram: 2200, facebook: 63206 };
 const CHAN_LABEL = { facebook: "Facebook", instagram: "Instagram" };
 const TYPES = ["feed", "reel", "story"];
-const CROP_OPTS = [["original", "Original"], ["1:1", "Square 1:1"], ["4:5", "Portrait 4:5"], ["1.91:1", "Landscape 1.91:1"], ["9:16", "Story/Reel 9:16"]];
 
 /* ---------------- Social connection ---------------- */
 function SocialConnect({ clientId, client, socials }) {
@@ -96,12 +96,14 @@ function buildOptions(socials) {
   return out;
 }
 
-function Composer({ clientId, socials, seedDate, editItem, onDone, dropbox, dropboxFolder }) {
+function Composer({ clientId, socials, seedDate, editItem, onDone, dropbox, dropboxFolder, brandLogo }) {
   const router = useRouter();
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
   const [uploading, setUploading] = useState(false);
   const [dbxOpen, setDbxOpen] = useState(false);
+  const [dbxFolder, setDbxFolder] = useState(dropboxFolder || "");
+  const [dragOver, setDragOver] = useState(false);
   const options = useMemo(() => buildOptions(socials), [socials]);
 
   const [selKeys, setSelKeys] = useState(() => {
@@ -115,11 +117,13 @@ function Composer({ clientId, socials, seedDate, editItem, onDone, dropbox, drop
   });
   const selChans = useMemo(() => [...new Set(selKeys.map((k) => k.split(":")[1]))], [selKeys]);
 
-  const [customize, setCustomize] = useState(() => !!(editItem?.variants && Object.keys(editItem.variants).length));
+  // Guard against legacy rows where variants was stored as a jsonb string/array
+  const editVariants = editItem?.variants && typeof editItem.variants === "object" && !Array.isArray(editItem.variants) ? editItem.variants : {};
+  const [customize, setCustomize] = useState(() => Object.keys(editVariants).length > 0);
   const [caption, setCaption] = useState(editItem?.caption || "");
   const [variants, setVariants] = useState(() => ({
-    facebook: { caption: editItem?.variants?.facebook?.caption || "", post_type: editItem?.variants?.facebook?.post_type || "feed" },
-    instagram: { caption: editItem?.variants?.instagram?.caption || "", post_type: editItem?.variants?.instagram?.post_type || "feed" },
+    facebook: { caption: editVariants.facebook?.caption || "", post_type: editVariants.facebook?.post_type || "feed" },
+    instagram: { caption: editVariants.instagram?.caption || "", post_type: editVariants.instagram?.post_type || "feed" },
   }));
   const [baseType, setBaseType] = useState(editItem?.post_type || "feed");
   const [link, setLink] = useState(editItem?.link || "");
@@ -128,7 +132,7 @@ function Composer({ clientId, socials, seedDate, editItem, onDone, dropbox, drop
   const [firstComment, setFirstComment] = useState(editItem?.first_comment || "");
   const [scheduledAt, setScheduledAt] = useState(seedDate || (editItem?.scheduled_at ? toLocalInput(editItem.scheduled_at) : nowPlus30()));
   const [activeTab, setActiveTab] = useState(selChans[0] || "facebook");
-  const [cropRatio, setCropRatio] = useState("original");
+  const [editorIdx, setEditorIdx] = useState(null);
   const [progress, setProgress] = useState({});
   const [igWarn, setIgWarn] = useState("");
   const [videoWarn, setVideoWarn] = useState("");
@@ -159,16 +163,19 @@ function Composer({ clientId, socials, seedDate, editItem, onDone, dropbox, drop
   }, [usesVideo, videoUrl]);
 
   async function onFiles(e) {
-    const files = [...e.target.files]; if (!files.length) return;
+    await uploadFiles([...e.target.files]);
+  }
+  async function uploadFiles(files) {
+    files = files.filter((f) => f.type.startsWith("image/"));
+    if (!files.length) return;
     setUploading(true); setIgWarn("");
     try {
       for (const f of files) {
-        let b64 = await fileToB64(f);
-        if (cropRatio !== "original") b64 = await cropToRatio(b64, IG_RATIOS[cropRatio]);
+        const b64 = await fileToB64(f);
         if (selChans.includes("instagram") && baseType === "feed") {
           try {
             const s = await imageSize(b64);
-            if (s.ratio < IG_FEED_MIN - 0.02 || s.ratio > IG_FEED_MAX + 0.02) setIgWarn("This image's shape is outside Instagram feed limits (portrait 4:5 to landscape 1.91:1). Pick a crop above so it isn't rejected.");
+            if (s.ratio < IG_FEED_MIN - 0.02 || s.ratio > IG_FEED_MAX + 0.02) setIgWarn("This image's shape is outside Instagram feed limits (portrait 4:5 to landscape 1.91:1). Click ✎ on the thumbnail to reframe it so it isn't rejected.");
           } catch {}
         }
         setProgress((p) => ({ ...p, [f.name]: 0 }));
@@ -299,21 +306,19 @@ function Composer({ clientId, socials, seedDate, editItem, onDone, dropbox, drop
           {videoWarn && <div className="cmp-warn">⚠ {videoWarn}</div>}
         </div>
       ) : (
-        <div className="cmp-field">
+        <div className={"cmp-field cmp-dropzone" + (dragOver ? " over" : "")}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => { e.preventDefault(); setDragOver(false); uploadFiles([...e.dataTransfer.files]); }}>
           <div className="cmp-label-row">
-            <label>Images {igActive && <span className="muted">· 1 for a Story, up to 10 for a carousel</span>}</label>
-            <div className="crop-sel">
-              <span className="muted" style={{ fontSize: 11 }}>Crop:</span>
-              <select value={cropRatio} onChange={(e) => setCropRatio(e.target.value)}>
-                {CROP_OPTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-              </select>
-            </div>
+            <label>Images {igActive && <span className="muted">· 1 for a Story, up to 10 for a carousel · or drag &amp; drop here</span>}</label>
+            <span className="muted" style={{ fontSize: 11 }}>✎ on a thumbnail opens the editor (crop, filters, logo)</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <input type="file" accept="image/*" multiple onChange={onFiles} disabled={uploading} />
             {dropbox && <button type="button" className="social-btn" onClick={() => setDbxOpen(true)}>📦 Add from Dropbox</button>}
           </div>
-          {dbxOpen && <DropboxPicker clientId={clientId} startPath={dropboxFolder || ""} onAdd={(url) => setMedia((m) => [...m, url])} onClose={() => setDbxOpen(false)} />}
+          {dbxOpen && <DropboxPicker clientId={clientId} startPath={dbxFolder} onDefaultSaved={(p) => setDbxFolder(p)} onAdd={(url) => setMedia((m) => [...m, url])} onClose={() => setDbxOpen(false)} />}
           {Object.entries(progress).map(([name, pct]) => (
             <div key={name} className="upl-prog">
               <div className="upl-bar"><div className="upl-fill" style={{ width: pct + "%" }} /></div>
@@ -324,9 +329,24 @@ function Composer({ clientId, socials, seedDate, editItem, onDone, dropbox, drop
           {media.length > 0 && (
             <div className="cmp-thumbs">
               {media.map((u, j) => (
-                <div key={j} className="cmp-thumb"><img src={u} alt="" /><button type="button" onClick={() => setMedia((m) => m.filter((_, i) => i !== j))}>×</button></div>
+                <div key={j} className="cmp-thumb">
+                  <img src={u} alt="" />
+                  <button type="button" onClick={() => setMedia((m) => m.filter((_, i) => i !== j))}>×</button>
+                  <button type="button" className="thumb-edit" title="Edit image" onClick={() => setEditorIdx(j)}>✎</button>
+                </div>
               ))}
             </div>
+          )}
+          {editorIdx !== null && media[editorIdx] && (
+            <ImageEditor src={media[editorIdx]} brandLogo={brandLogo}
+              onApply={async (dataUrl) => {
+                setUploading(true);
+                try {
+                  const d = await uploadImage({ image_base64: dataUrl, filename: "edited.jpg" });
+                  if (d.url) setMedia((m) => m.map((u, i) => (i === editorIdx ? d.url : u)));
+                } finally { setUploading(false); }
+              }}
+              onClose={() => setEditorIdx(null)} />
           )}
         </div>
       )}
@@ -415,7 +435,7 @@ function TypePicker({ value, onChange }) {
 }
 
 /* ---------------- Main ---------------- */
-export default function ContentManager({ clientId, client, items, socials, open: openProp, setOpen: setOpenProp, seedDate, editId, dropbox, dropboxFolder }) {
+export default function ContentManager({ clientId, client, items, socials, open: openProp, setOpen: setOpenProp, seedDate, editId, dropbox, dropboxFolder, brandLogo }) {
   const router = useRouter();
   const [openLocal, setOpenLocal] = useState(false);
   const open = openProp !== undefined ? openProp : openLocal;
@@ -499,7 +519,7 @@ export default function ContentManager({ clientId, client, items, socials, open:
       {open && (
         <>
           {editItem && <div className="cmp-editing">Editing an existing {STATUS_LABEL[editItem.status]?.toLowerCase()} post</div>}
-          <Composer key={editItem?.id || "new"} clientId={clientId} socials={socials} seedDate={seedDate} editItem={editItem} dropbox={dropbox} dropboxFolder={dropboxFolder} onDone={(m) => { flash(m); setOpen(false); setEditItem(null); }} />
+          <Composer key={editItem?.id || "new"} clientId={clientId} socials={socials} seedDate={seedDate} editItem={editItem} dropbox={dropbox} dropboxFolder={dropboxFolder} brandLogo={brandLogo} onDone={(m) => { flash(m); setOpen(false); setEditItem(null); }} />
         </>
       )}
 
