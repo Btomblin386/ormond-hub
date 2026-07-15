@@ -80,6 +80,33 @@ export default function AssistantPanel({ clientId, client, tasks, agency }) {
                 </div>
                 {t.result && <div className="task-result">{t.result}</div>}
                 {t.error && <div className="push-err">{t.error}</div>}
+                {t.proposal?.action === "delete_posts" && (
+                  <div className={"prop-box " + t.proposal.state}>
+                    <div className="prop-box-head">
+                      {t.proposal.state === "pending" && <>🗑 Wants to delete <b>{t.proposal.ids?.length}</b> post(s) — {t.proposal.reason}</>}
+                      {t.proposal.state === "confirmed" && <>🗑 Deleted <b>{t.proposal.deleted ?? t.proposal.ids?.length}</b> post(s) · undo available for 30 days</>}
+                      {t.proposal.state === "undone" && <>↩ Deletion undone — {t.proposal.restored ?? t.proposal.ids?.length} post(s) restored</>}
+                      {t.proposal.state === "rejected" && <>✕ Deletion rejected — nothing was removed</>}
+                    </div>
+                    {t.proposal.state === "pending" && (
+                      <ul className="prop-details">
+                        {(t.proposal.details || []).slice(0, 8).map((d) => (
+                          <li key={d.id}>{d.client ? <b>{d.client} · </b> : null}{d.status} · {d.scheduled_at ? new Date(d.scheduled_at).toLocaleDateString() : "no date"} — {d.caption}</li>
+                        ))}
+                        {(t.proposal.details || []).length > 8 && <li>…and {(t.proposal.details || []).length - 8} more</li>}
+                      </ul>
+                    )}
+                    <div className="task-actions" style={{ marginTop: 6 }}>
+                      {t.proposal.state === "pending" && <>
+                        <button className="rule-del" disabled={busy === t.id + "confirm_action"} onClick={() => act(t.id, "confirm_action")}>Confirm delete</button>
+                        <button className="cal-reject" disabled={busy === t.id + "reject_action"} onClick={() => act(t.id, "reject_action")}>Reject</button>
+                      </>}
+                      {t.proposal.state === "confirmed" && (
+                        <button className="cal-reject" disabled={busy === t.id + "undo_action"} onClick={() => act(t.id, "undo_action")}>↩ Undo delete</button>
+                      )}
+                    </div>
+                  </div>
+                )}
                 <div className="task-actions">
                   {t.status === "done" && !agency && <Link href={`/accounts/${clientId}/content`} className="rowlink">View drafts →</Link>}
                   {t.status === "done" && agency && <Link href="/" className="rowlink">View calendar →</Link>}

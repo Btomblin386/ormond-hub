@@ -102,6 +102,10 @@ FB Login redirect URI to whitelist: `https://<prod-domain>/api/oauth/facebook/ca
   NotificationsFeed, TeamManager, OnboardClient. Media utils in `lib/media.js` (crop/upload-progress/video-validate).
 
 ## Pending backlog (in priority order chosen by Brooks)
+0. **Mobile app (future project — after the web hub is done)** — manual-publish workflow for
+   music-critical IG reels: download the post's media, copy caption to clipboard, deep-link into the
+   IG app to add licensed music ("notification publishing" — the API cannot attach IG catalog music).
+   Plus push notifications when a post passes its scheduled date without approval.
 1. **Smart Insights for non-GA4 clients** — generate-insights only iterates clients present in
    ga4_product_monthly (currently Slavens only), so every other brand has an empty Smart Insights tab and no
    insight notifications. Build a daily_metrics-based signal path (campaign-level WoW/MoM trends) for clients
@@ -115,6 +119,17 @@ Also requested (not yet scheduled):
 - Social insights tab (pin/enter starting stats + date, track over selectable periods).
 - Push/email alerts for approvals + missed schedules (currently in-app notifications only).
 - Full top-nav conversion (OneUp-style) — layout is widened but nav still left-rail.
+
+## Recently shipped (2026-07-15, assistant curation powers)
+- **Assistant can now see and (with confirmation) delete posts.** Runner v3 tools: list_posts
+  (read-only) and propose_deletions — proposals are stored on the task (`account_tasks.proposal`
+  jsonb) and NEVER execute directly. The Assistant page renders a card: Confirm delete / Reject;
+  confirmed = soft delete (`content_items.deleted_at`), with an ↩ Undo button (30-day window,
+  pg_cron `purge-soft-deleted` hard-deletes older rows daily). All content reads + the publisher
+  filter `deleted_at is null`; manual Delete buttons also soft-delete now. Storage cost ≈ nothing
+  (flag column; media in the bucket is untouched).
+- Verified in prod: agency task on FunnelWeb correctly listed the 3 ANEC drafts and filed a pending
+  3-post proposal in 22s (background trigger), deleting nothing.
 
 ## Recently shipped (2026-07-15, big fix/feature batch)
 - **CRITICAL jsonb fix** — postgres.js infers param types from `::jsonb` casts, so every

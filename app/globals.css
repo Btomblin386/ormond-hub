@@ -714,3 +714,11 @@ input, textarea, select, button { font-family: inherit; font-size: inherit; }
 .sheet-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .mention-strip { display: flex; gap: 4px; overflow-x: auto; }
 video.mention-media { max-width: 240px; border-radius: 8px; }
+
+/* ---------- Assistant deletion proposals ---------- */
+.prop-box { border-radius: 10px; padding: 10px 12px; margin-top: 8px; font-size: 12.5px; border: 1px solid #fecaca; background: #fef2f2; }
+.prop-box.confirmed { border-color: #fde68a; background: #fffbeb; }
+.prop-box.undone, .prop-box.rejected { border-color: #e5e7eb; background: #f9fafb; color: #6b7280; }
+.prop-box-head { font-weight: 600; color: #111827; }
+.prop-box.undone .prop-box-head, .prop-box.rejected .prop-box-head { color: #6b7280; font-weight: 500; }
+.prop-box .prop-details { margin: 6px 0 0; padding-left: 18px; color: #374151; }

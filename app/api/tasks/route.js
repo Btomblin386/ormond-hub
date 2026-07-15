@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createTask, setTaskStatus, deleteTask } from "../../../lib/db";
+import { createTask, setTaskStatus, deleteTask, getTask, setTaskProposal, softDeletePosts, restorePosts } from "../../../lib/db";
 import { getSession } from "../../../lib/session";
 
 export const dynamic = "force-dynamic";
@@ -52,6 +52,31 @@ export async function POST(req) {
     if (op === "delete") {
       await deleteTask(b.id);
       return NextResponse.json({ ok: true });
+    }
+
+    // ---- assistant deletion proposals: confirm / reject / undo ----
+    if (op === "confirm_action" || op === "reject_action" || op === "undo_action") {
+      const task = await getTask(b.id);
+      const p = task?.proposal;
+      if (!p || p.action !== "delete_posts") return NextResponse.json({ error: "no proposal on this task" }, { status: 400 });
+      const by = getSession()?.name || "Agency";
+
+      if (op === "reject_action") {
+        if (p.state !== "pending") return NextResponse.json({ error: "proposal is not pending" }, { status: 400 });
+        await setTaskProposal(b.id, { ...p, state: "rejected", decided_by: by, decided_at: new Date().toISOString() });
+        return NextResponse.json({ ok: true });
+      }
+      if (op === "confirm_action") {
+        if (p.state !== "pending") return NextResponse.json({ error: "proposal is not pending" }, { status: 400 });
+        const rows = await softDeletePosts(p.ids || []);
+        await setTaskProposal(b.id, { ...p, state: "confirmed", deleted: rows.length, decided_by: by, decided_at: new Date().toISOString() });
+        return NextResponse.json({ ok: true, deleted: rows.length });
+      }
+      // undo
+      if (p.state !== "confirmed") return NextResponse.json({ error: "nothing to undo" }, { status: 400 });
+      const rows = await restorePosts(p.ids || []);
+      await setTaskProposal(b.id, { ...p, state: "undone", restored: rows.length, undone_at: new Date().toISOString() });
+      return NextResponse.json({ ok: true, restored: rows.length });
     }
     return NextResponse.json({ error: "unknown op" }, { status: 400 });
   } catch (e) {
