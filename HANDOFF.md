@@ -120,6 +120,12 @@ Also requested (not yet scheduled):
 - Push/email alerts for approvals + missed schedules (currently in-app notifications only).
 - Full top-nav conversion (OneUp-style) — layout is widened but nav still left-rail.
 
+## Recently shipped (2026-07-16, Brand Listener: Lectron IG fix + post-type chips)
+- Root cause of Lectron showing 0 IG mentions: Meta's `{ig-user-id}/tags` returns `{error:{code:1,"reduce the amount of data"}}` for heavily-tagged accounts — even `fields=id&limit=25` fails, and a poisoned media item ~position 21 in Lectron's feed errors at ANY page size once the cursor reaches it. brand-listen v13 never checked `tags.error`, so it silently stored nothing.
+- brand-listen **v15**: `igTagsPaged()` pages `/tags` at limit=5 following `paging.next` (shrinks to 2 once on code-1); a failing page past the first returns the mentions already collected as a partial result with a warning ("kept newest N") instead of losing everything. All Meta legs (FB tagged / visitor posts / IG tags) surface errors in the poll response `err`; FB `visitor_posts` "Permissions error" is suppressed as known-deprecated (New Pages Experience removed that edge — no fb_visitor rows were ever stored).
+- Post-type classification: IG requests include `media_product_type`; `media_kind` ∈ image/video/carousel/reel/story. BrandListener shows a type chip (Picture/Video/Carousel/Reel/Story) on every mention and plays Reels as video. All brands re-polled; existing rows reclassified via upsert.
+- IG **story mentions are NOT captured** by polling — Meta only delivers them via the `mentions` webhook (stories expire in 24h). Building it needs a public callback route + subscribing the Meta app to Instagram webhooks in the dashboard (Brooks). `mtype ig_story_mention` / kind `story` already reserved in schema/UI. Backlog.
+
 ## Recently shipped (2026-07-15, Dropbox folder restrictions)
 - **Owner-level Dropbox folder visibility** — Settings → Dropbox → "Manage folder visibility": tick
   Hidden on any folder (personal space, sensitive client folders) and it — plus everything inside —

@@ -168,6 +168,8 @@ function Mention({ clientId, m, onRepurpose }) {
 
   const isFb = String(m.mtype || "").startsWith("fb");
   const canReply = ["fb_tag", "fb_visitor", "fb_mention", "ig_tag", "ig_comment", "ig_mention"].includes(m.mtype);
+  const KIND_LABEL = { image: "Picture", video: "Video", carousel: "Carousel", reel: "Reel", story: "Story" };
+  const isVideo = m.media_kind === "video" || m.media_kind === "reel";
 
   async function act(action, message) {
     setBusy(action);
@@ -182,7 +184,7 @@ function Mention({ clientId, m, onRepurpose }) {
   return (
     <div className="mention">
       <span className={"sent " + (m.sentiment || "neutral")} />
-      {m.media_kind === "video" && m.media_url ? (
+      {isVideo && m.media_url ? (
         <video className="mention-media" src={m.media_url} controls muted playsInline poster={m.media_urls?.[0] || undefined} />
       ) : Array.isArray(m.media_urls) && m.media_urls.length > 1 ? (
         <div className="mention-strip">
@@ -199,6 +201,7 @@ function Mention({ clientId, m, onRepurpose }) {
         </div>
         {m.snippet && <div className="mention-snip">{m.snippet.slice(0, 240)}</div>}
         <div className="mention-tags">
+          {m.media_kind && <span className="mtag kind">{KIND_LABEL[m.media_kind] || m.media_kind}</span>}
           {(m.tags || []).map((t) => <span key={t} className="mtag">{t}</span>)}
           {m.author && <span className="mention-author">{m.author}</span>}
           {m.responded && <span className="mtag replied">replied</span>}

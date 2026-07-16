@@ -502,6 +502,7 @@ a.mention-title:hover { color: #6366f1; }
 .err-flag.inline.permanent { background: #fef2f2; color: #b91c1c; }
 .mention-media { width: 46px; height: 46px; object-fit: cover; border-radius: 8px; border: 1px solid #e6e8eb; flex-shrink: 0; }
 .mtag.replied { background: #dcfce7; color: #15803d; }
+.mtag.kind { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
 .mention-actions { display: flex; gap: 6px; margin-top: 6px; align-items: center; }
 .mention-actions button { border: 1px solid #d1d5db; background: #fff; font-size: 11px; padding: 3px 10px; border-radius: 7px; cursor: pointer; color: #374151; }
 .mention-actions button:disabled { opacity: .6; }
