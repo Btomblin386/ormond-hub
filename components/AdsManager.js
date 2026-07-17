@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import CampaignLauncher from "./CampaignLauncher";
+import CampaignTree from "./CampaignTree";
 
 const money = (n) => "$" + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
 
@@ -61,9 +62,12 @@ export default function AdsManager({ accountId, accountExt, cap, urlParams, camp
         <h2>Ads management</h2>
         <CampaignLauncher accountExt={accountExt} clientId={clientId} />
       </div>
-      <p className="note">Duplicate a campaign with an Instagram post as the creative, pause/resume, and adjust budgets. Everything is created paused; budget changes are capped, and every action is logged below.</p>
+      <p className="note">Create or duplicate campaigns with an Instagram post as the creative, manage every campaign, ad set, and ad live from Meta. Everything is created paused; budget changes are capped, and every action is logged below.</p>
 
       {msg && <div className="mng-msg">{msg}</div>}
+
+      <div className="studio-h" style={{ marginTop: 4 }}>Campaign structure — live from Meta</div>
+      <CampaignTree accountExt={accountExt} clientId={clientId} />
 
       <div className="mng-cap">
         <label>Daily spend cap</label>
@@ -82,6 +86,7 @@ export default function AdsManager({ accountId, accountExt, cap, urlParams, camp
         <span className="mng-hint">Auto-appended to destination URLs on every new campaign from Studio.</span>
       </div>
 
+      <div className="studio-h" style={{ marginTop: 14 }}>Spend this window</div>
       <div className="mng-table-wrap">
         <table>
           <thead>
