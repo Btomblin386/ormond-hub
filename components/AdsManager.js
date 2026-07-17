@@ -1,10 +1,11 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import CampaignLauncher from "./CampaignLauncher";
 
 const money = (n) => "$" + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
 
-export default function AdsManager({ accountId, accountExt, cap, urlParams, campaigns, writes }) {
+export default function AdsManager({ accountId, accountExt, cap, urlParams, campaigns, writes, clientId }) {
   const router = useRouter();
   const [capInput, setCapInput] = useState(cap == null ? "" : String(cap));
   const [paramsInput, setParamsInput] = useState(urlParams || "");
@@ -56,8 +57,11 @@ export default function AdsManager({ accountId, accountExt, cap, urlParams, camp
 
   return (
     <div className="panel">
-      <h2>Ads management</h2>
-      <p className="note">Pause/resume campaigns and adjust budgets. Nothing is created here except paused drafts; budget changes are capped, and every action is logged below.</p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <h2>Ads management</h2>
+        <CampaignLauncher accountExt={accountExt} clientId={clientId} />
+      </div>
+      <p className="note">Duplicate a campaign with an Instagram post as the creative, pause/resume, and adjust budgets. Everything is created paused; budget changes are capped, and every action is logged below.</p>
 
       {msg && <div className="mng-msg">{msg}</div>}
 

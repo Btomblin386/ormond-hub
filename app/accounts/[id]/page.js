@@ -195,6 +195,7 @@ export default async function AccountDetail({ params, searchParams }) {
           urlParams={acct.url_params}
           campaigns={managedCampaigns}
           writes={adWrites}
+          clientId={acct.id}
         />
       </div>
 
