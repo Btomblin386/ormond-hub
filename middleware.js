@@ -30,6 +30,15 @@ async function verifyToken(token, secret) {
 
 export async function middleware(req) {
   const { pathname } = req.nextUrl;
+
+  // TikTok (or any provider) domain-ownership via a root verification FILE:
+  // set TIKTOK_VERIFY_FILENAME (e.g. "tiktok1a2b3c.txt") and TIKTOK_VERIFY_BODY
+  // in Vercel, and this serves it publicly at /<filename>. No code change needed.
+  const ttFile = process.env.TIKTOK_VERIFY_FILENAME;
+  if (ttFile && pathname === "/" + ttFile) {
+    return new NextResponse(process.env.TIKTOK_VERIFY_BODY || ttFile, { status: 200, headers: { "Content-Type": "text/plain" } });
+  }
+
   if (PUBLIC.some((p) => pathname.startsWith(p))) return NextResponse.next();
 
   // The root is reachable logged-out: app/page.js shows a public landing page
