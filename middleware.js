@@ -12,13 +12,13 @@ function b64urlFromBytes(bytes) {
 }
 
 async function verifyToken(token, secret) {
-  const [body, sig] = (token || "").split(".");
-  if (!body || !sig) return null;
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, enc.encode(body)));
-  if (b64urlFromBytes(mac) !== sig) return null;
   try {
+    const [body, sig] = (token || "").split(".");
+    if (!body || !sig || !secret) return null;
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, enc.encode(body)));
+    if (b64urlFromBytes(mac) !== sig) return null;
     let b = body.replace(/-/g, "+").replace(/_/g, "/");
     while (b.length % 4) b += "=";
     const bytes = Uint8Array.from(atob(b), (ch) => ch.charCodeAt(0));
@@ -39,15 +39,23 @@ export async function middleware(req) {
     return NextResponse.next();
   }
 
-  const secret = process.env.DASHBOARD_PASSWORD;
+  // FAIL CLOSED: with no server secret there is no way to verify anyone —
+  // block everything rather than let everyone through. (A missing
+  // DASHBOARD_PASSWORD env var once made `undefined === undefined` grant
+  // agency access to anonymous visitors. Never again.)
+  const secret = process.env.DASHBOARD_PASSWORD || "";
   let session = null;
-  const tok = req.cookies.get("hub_session")?.value;
-  if (tok) session = await verifyToken(tok, secret);
-  if (!session && req.cookies.get("hub_auth")?.value === secret) session = { role: "agency" };
+  if (secret) {
+    const tok = req.cookies.get("hub_session")?.value;
+    if (tok) session = await verifyToken(tok, secret);
+    const legacy = req.cookies.get("hub_auth")?.value;
+    if (!session && legacy && legacy === secret) session = { role: "agency" };
+  }
 
   if (!session) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
+    url.search = secret ? "" : "?e=cfg";
     return NextResponse.redirect(url);
   }
 
