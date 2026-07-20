@@ -10,7 +10,7 @@ import CampaignStudio from "../../../components/CampaignStudio";
 import AdsManager from "../../../components/AdsManager";
 import RulesManager from "../../../components/RulesManager";
 import AccountTabs from "../../../components/AccountTabs";
-import { accountById, accountTotals, accountTrend, accountCampaigns, clientsWithGa4, insightsForClient, insightsGeneratedAt, storeMonthly, pinnedForClient, campaignPlanForClient, accountCampaignsManaged, adWritesForAccount, rulesForAccount, ruleEventsForAccount } from "../../../lib/db";
+import { accountById, accountTotals, accountTrend, accountCampaigns, clientsWithGa4, insightsForClient, insightsGeneratedAt, storeMonthly, pinnedForClient, campaignPlanForClient, accountCampaignsManaged, adWritesForAccount, rulesForAccount, ruleEventsForAccount, chatHistory } from "../../../lib/db";
 import { money, num, roas, roasClass } from "../../../lib/format";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -29,13 +29,14 @@ export default async function AccountDetail({ params, searchParams }) {
   if (!acct) notFound();
   const adId = acct.ad_account_id;
 
-  const [ga4Clients, insights, insightsAt, store, pinned, campaignPlan] = await Promise.all([
+  const [ga4Clients, insights, insightsAt, store, pinned, campaignPlan, chatMsgs] = await Promise.all([
     clientsWithGa4(),
     insightsForClient(acct.client),
     insightsGeneratedAt(acct.client),
     storeMonthly(acct.client),
     pinnedForClient(acct.client),
     campaignPlanForClient(acct.client),
+    chatHistory(acct.id).catch(() => []),
   ]);
 
   let totals = { spend: 0, revenue: 0, conversions: 0, clicks: 0, impressions: 0 };
@@ -141,7 +142,7 @@ export default async function AccountDetail({ params, searchParams }) {
         </div>
       )}
 
-      <AccountChat client={acct.client} accountExt={acct.external_account_id} accountId={acct.ad_account_id} />
+      <AccountChat client={acct.client} accountExt={acct.external_account_id} accountId={acct.ad_account_id} clientId={acct.id} initialMessages={chatMsgs} />
 
       {store.length > 0 && (
         <div className="panel">

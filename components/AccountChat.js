@@ -67,8 +67,17 @@ function ProposalCard({ proposal, applied, busy, onConfirm, onDismiss }) {
   );
 }
 
-export default function AccountChat({ client, accountExt, accountId }) {
-  const [messages, setMessages] = useState([]);
+export default function AccountChat({ client, accountExt, accountId, clientId, initialMessages }) {
+  // History is stored per client and reloaded on every visit, so the thread
+  // survives navigating to other tabs. Proposal cards are re-extracted from the
+  // stored assistant replies.
+  const [messages, setMessages] = useState(() =>
+    (initialMessages || []).map((m) => {
+      if (m.role !== "assistant") return { role: m.role, content: m.content };
+      const { text, proposal } = extractProposal(m.content);
+      return { role: "assistant", content: text || m.content, proposal, applied: null };
+    })
+  );
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [applyBusy, setApplyBusy] = useState(false);
@@ -89,7 +98,7 @@ export default function AccountChat({ client, accountExt, accountId }) {
       const resp = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client, messages: next.map((m) => ({ role: m.role, content: m.content })) }),
+        body: JSON.stringify({ client, clientId, messages: next.map((m) => ({ role: m.role, content: m.content })) }),
       });
       const data = await resp.json();
       const reply = data.reply || (data.error ? `Error: ${data.error}` : "No response.");
@@ -139,10 +148,19 @@ export default function AccountChat({ client, accountExt, accountId }) {
     }
   }
 
+  async function clearHistory() {
+    if (!window.confirm("Clear this account's chat history?")) return;
+    await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "clear", clientId }) });
+    setMessages([]);
+  }
+
   return (
     <div className="panel">
-      <h2>Ask about this account</h2>
-      <p className="note">Answers use this account&apos;s live data. The assistant can also propose changes — pause/resume a campaign, set a budget, draft a paused campaign, set URL params — which run only after you confirm.</p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+        <h2>Ask about this account</h2>
+        {messages.length > 0 && <button className="social-btn" onClick={clearHistory}>Clear chat</button>}
+      </div>
+      <p className="note">Answers use this account&apos;s live data — including day-by-day GA4 traffic and source/medium breakdowns. The conversation is saved with the account, so it&apos;s still here after you visit other tabs. The assistant can also propose changes — pause/resume a campaign, set a budget, draft a paused campaign, set URL params — which run only after you confirm.</p>
 
       <div className="chat-log" ref={scrollRef}>
         {messages.length === 0 && (
