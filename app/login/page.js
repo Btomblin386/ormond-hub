@@ -7,8 +7,8 @@ export default function Login({ searchParams }) {
       {err === "cfg"
         ? <div className="err">Server is missing its DASHBOARD_PASSWORD environment variable — sign-in is disabled until it&apos;s set in Vercel and redeployed.</div>
         : err ? <div className="err">Incorrect email or password.</div> : null}
-      <input type="email" name="email" placeholder="Email (leave blank for agency password)" autoComplete="username" />
-      <input type="password" name="password" placeholder="Password" autoFocus autoComplete="current-password" />
+      <input type="email" name="email" placeholder="Email" autoComplete="username" required />
+      <input type="password" name="password" placeholder="Password" autoFocus autoComplete="current-password" required />
       <button type="submit">Sign in</button>
     </form>
   );
