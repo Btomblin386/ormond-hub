@@ -12,7 +12,7 @@ content scheduling/approval, brand listening, and repurposing — across ~5 bran
 
 ## Vercel env vars
 - `DATABASE_URL` — Supabase transaction pooler URI.
-- `DASHBOARD_PASSWORD` — legacy agency password AND the HMAC signing key for per-user sessions.
+- `DASHBOARD_PASSWORD` — break-glass agency password AND the HMAC signing key for per-user sessions. The shared-password login now lives ONLY at `/agency-master-login` (form sets `agency_master=1`); `/login` is email+password only and a blank email no longer triggers the shared path. Both pages are in middleware PUBLIC.
 - `GOOGLE_OAUTH_CLIENT_ID` — Google OAuth web client (the SECRET lives only in Supabase secrets).
 
 ## Google OAuth setup (one-time, Brooks)
