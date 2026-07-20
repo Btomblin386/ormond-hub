@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const PUBLIC = ["/login", "/agency-master-login", "/api/login", "/privacy", "/terms", "/data-deletion"];
+const PUBLIC = ["/login", "/agency-master-login", "/api/login", "/api/media", "/privacy", "/terms", "/data-deletion"];
 
 // Paid-marketing APIs that creators/clients may not call
 const PAID_APIS = ["/api/manage", "/api/create", "/api/rules", "/api/account-settings", "/api/campaign-plan", "/api/audiences", "/api/pin", "/api/users", "/api/analytics", "/api/analytics-summary", "/api/oauth", "/api/tasks"];
