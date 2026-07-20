@@ -49,9 +49,14 @@ async function handle(req, method) {
     if (v) headers.set(k, v);
   }
   if (!headers.has("accept-ranges")) headers.set("accept-ranges", "bytes");
-  headers.set("cache-control", "public, max-age=3600");
+  // Do NOT let Vercel's CDN cache/normalize this — a cached full response served
+  // against a Range request corrupts partial fetches (and the status).
+  headers.set("cache-control", "no-store");
 
-  return new Response(method === "HEAD" ? null : upstream.body, { status: upstream.status, headers });
+  // Preserve partial-content semantics: a Range that upstream honored must stay 206.
+  const status = range && (upstream.status === 206 || upstream.headers.get("content-range")) ? 206 : upstream.status;
+
+  return new Response(method === "HEAD" ? null : upstream.body, { status, headers });
 }
 
 export async function GET(req) { return handle(req, "GET"); }
