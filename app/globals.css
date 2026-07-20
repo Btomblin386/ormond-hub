@@ -537,6 +537,26 @@ a.mention-title:hover { color: #6366f1; }
 .ctree-thumb { width: 34px; height: 34px; border-radius: 7px; object-fit: cover; background: #f1f5f9; }
 .ctree-thumb.none { display: inline-block; }
 .ctree-swap { padding: 8px 12px 12px 58px; border-top: 1px dashed #e2e8f0; background: #fafbfc; }
+
+/* Composer text formatting bar + Post Now */
+.fmt-bar { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; }
+.fmt-bar button { border: 1px solid #d1d5db; background: #fff; border-radius: 6px; width: 30px; height: 28px; cursor: pointer; font-size: 13px; line-height: 1; color: #334155; }
+.fmt-bar button:hover { background: #f1f5f9; }
+.fmt-hint { font-size: 11px; color: #94a3b8; margin-left: 6px; }
+.cmp-btn.now { background: #7c3aed; color: #fff; border: 1px solid #7c3aed; }
+.cmp-btn.now:hover { background: #6d28d9; }
+.cmp-btn.now:disabled { opacity: .6; }
+.cal-time-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
+.cal-time-row input { border: 1px solid #d1d5db; border-radius: 8px; padding: 6px 9px; font: inherit; font-size: 13px; }
+.pw-reset { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; width: 100%; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e2e8f0; }
+.pw-reset input { flex: 1; min-width: 220px; border: 1px solid #d1d5db; border-radius: 8px; padding: 7px 10px; font: inherit; font-size: 13px; }
+.cred-table { width: 100%; }
+.cred-how-row td { background: #f8fafc; }
+.cred-how { padding: 4px 2px; font-size: 12.5px; }
+.cred-how ol { margin: 6px 0 0; padding-left: 18px; }
+.cred-how li { margin: 3px 0; color: #475569; }
+.notif-x { border: 0; background: transparent; color: #94a3b8; font-size: 18px; line-height: 1; cursor: pointer; padding: 0 4px; align-self: flex-start; }
+.notif-x:hover { color: #475569; }
 .mention-actions { display: flex; gap: 6px; margin-top: 6px; align-items: center; }
 .mention-actions button { border: 1px solid #d1d5db; background: #fff; font-size: 11px; padding: 3px 10px; border-radius: 7px; cursor: pointer; color: #374151; }
 .mention-actions button:disabled { opacity: .6; }

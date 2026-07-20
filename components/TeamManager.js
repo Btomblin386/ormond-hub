@@ -35,6 +35,31 @@ export default function TeamManager({ users, clients }) {
       router.refresh();
     } finally { setBusy(""); }
   }
+  async function reactivate(id) {
+    setBusy(id);
+    try {
+      await fetch("/api/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "reactivate", id }) });
+      router.refresh();
+    } finally { setBusy(""); }
+  }
+  const [resetFor, setResetFor] = useState(null);
+  const [newPass, setNewPass] = useState("");
+  async function resetPassword(id) {
+    if (newPass.length < 6) { flash("New password must be at least 6 characters."); return; }
+    setBusy(id + "pw");
+    try {
+      const r = await fetch("/api/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "reset_password", id, password: newPass }) });
+      const d = await r.json();
+      if (d.error) flash("Error: " + d.error);
+      else { flash("Password reset — send the new one to them. It also reactivates the login."); setResetFor(null); setNewPass(""); }
+    } finally { setBusy(""); }
+  }
+  function randomPass() {
+    const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+    let p = "";
+    for (let i = 0; i < 12; i++) p += chars[Math.floor(Math.random() * chars.length)];
+    setNewPass(p);
+  }
 
   return (
     <div className="panel">
@@ -71,18 +96,30 @@ export default function TeamManager({ users, clients }) {
       <div className="content-list">
         {users.length === 0 && <div className="muted" style={{ fontSize: 13 }}>No per-user logins yet — you&apos;re signed in with the agency password.</div>}
         {users.map((u) => (
-          <div key={u.id} className="content-row">
+          <div key={u.id} className="content-row" style={{ flexWrap: "wrap" }}>
             <div className="content-main">
               <div className="content-top">
                 <span className={"role-badge " + u.role}>{u.role}</span>
                 <b>{u.name || u.email}</b>
                 <span className="muted" style={{ fontSize: 12 }}>{u.email}</span>
                 {u.client_name && <span className="pill content">{u.client_name}</span>}
+                {u.active === false && <span className="pill" style={{ background: "#fee2e2", color: "#b91c1c" }}>deactivated</span>}
               </div>
             </div>
             <div className="content-actions">
-              <button className="rule-del" disabled={busy === u.id} onClick={() => remove(u.id)}>Deactivate</button>
+              <button className="social-btn" disabled={busy === u.id + "pw"} onClick={() => { setResetFor(resetFor === u.id ? null : u.id); setNewPass(""); }}>{resetFor === u.id ? "Cancel" : "Reset password"}</button>
+              {u.active === false
+                ? <button className="cal-approve" disabled={busy === u.id} onClick={() => reactivate(u.id)}>Reactivate</button>
+                : <button className="rule-del" disabled={busy === u.id} onClick={() => remove(u.id)}>Deactivate</button>}
             </div>
+            {resetFor === u.id && (
+              <div className="pw-reset">
+                <input type="text" value={newPass} onChange={(e) => setNewPass(e.target.value)} placeholder="New temporary password (≥ 6 chars)" />
+                <button className="social-btn" type="button" onClick={randomPass}>Generate</button>
+                <button className="push-create" disabled={busy === u.id + "pw" || newPass.length < 6} onClick={() => resetPassword(u.id)}>{busy === u.id + "pw" ? "Saving…" : "Set password"}</button>
+                <span className="muted" style={{ fontSize: 11, flexBasis: "100%" }}>You&apos;ll need to send this to them — the hub doesn&apos;t email it out.</span>
+              </div>
+            )}
           </div>
         ))}
       </div>

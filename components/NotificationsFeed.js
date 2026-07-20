@@ -6,8 +6,17 @@ import { useState } from "react";
 export default function NotificationsFeed({ data }) {
   const router = useRouter();
   const [busy, setBusy] = useState("");
-  const { todos = [], failed = [], ruleEvents = [], insights = [], overdue = [], stuck = [], reminders = [], taskResults = [] } = data || {};
-  const total = todos.length + failed.length + ruleEvents.length + insights.length + overdue.length + stuck.length + reminders.length + taskResults.length;
+  const { spendDrops = [], todos = [], failed = [], ruleEvents = [], insights = [], overdue = [], stuck = [], reminders = [], taskResults = [] } = data || {};
+  const total = spendDrops.length + todos.length + failed.length + ruleEvents.length + insights.length + overdue.length + stuck.length + reminders.length + taskResults.length;
+
+  async function dismiss(key) {
+    setBusy(key);
+    try {
+      await fetch("/api/notifications", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "dismiss", key }) });
+      router.refresh();
+    } finally { setBusy(""); }
+  }
+  const X = ({ k }) => <button className="notif-x" title="Dismiss" disabled={busy === k} onClick={() => dismiss(k)}>×</button>;
 
   async function approve(id) {
     setBusy(id);
@@ -35,6 +44,16 @@ export default function NotificationsFeed({ data }) {
 
   return (
     <div className="notif-list">
+      {spendDrops.map((s) => (
+        <div key={s._key} className="notif fail">
+          <span className="notif-dot fail" />
+          <div className="notif-body">
+            <div className="notif-title">💳 Ad spend dropped to near $0 · <Link href={`/accounts/${s.account_id}`}>{s.client}</Link></div>
+            <div className="notif-sub">Was averaging ${s.base_daily}/day, but only ${s.recent2} in the last 2 days (through {s.as_of}). Check the account&apos;s payment method or whether Meta paused it for billing.</div>
+          </div>
+          <X k={s._key} />
+        </div>
+      ))}
       {reminders.map((t) => (
         <div key={"rm" + t.id} className="notif todo">
           <span className="notif-dot approval" />
@@ -63,6 +82,7 @@ export default function NotificationsFeed({ data }) {
             <div className="notif-sub">{t.status === "needs_approval" ? "Waiting on approval — " : "Still a draft — "}{t.caption?.slice(0, 80) || "(no caption)"}</div>
           </div>
           <button className="cal-approve" disabled={busy === t.id} onClick={() => approve(t.id)}>Approve now</button>
+          <X k={t._key} />
         </div>
       ))}
       {todos.map((t) => (
@@ -82,6 +102,7 @@ export default function NotificationsFeed({ data }) {
             <div className="notif-title">Post stuck publishing · <b>{t.client}</b> <span className="notif-when">since {new Date(t.created_at).toLocaleString()}</span></div>
             <div className="notif-sub">Publisher hasn&apos;t completed this post — check the function logs if it persists. {t.caption?.slice(0, 70) || ""}</div>
           </div>
+          <X k={t._key} />
         </div>
       ))}
       {failed.map((t) => (
@@ -91,6 +112,7 @@ export default function NotificationsFeed({ data }) {
             <div className="notif-title">Post failed · <b>{t.client}</b> <span className={"err-flag inline " + (t.error_kind || "permanent")}>{t.error_kind === "transient" ? "retry shortly" : "needs a fix"}</span></div>
             <div className="notif-sub">{t.error}</div>
           </div>
+          <X k={t._key} />
         </div>
       ))}
       {ruleEvents.map((e) => (
@@ -110,6 +132,7 @@ export default function NotificationsFeed({ data }) {
             <div className="notif-title">{n.category === "issue" ? "Issue" : "Opportunity"} · <b>{n.client}</b></div>
             <div className="notif-sub">{n.title}</div>
           </div>
+          <X k={n._key} />
         </div>
       ))}
     </div>

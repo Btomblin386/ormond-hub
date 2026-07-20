@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Shell from "../../components/Shell";
 import TeamManager from "../../components/TeamManager";
 import DropboxFolderControl from "../../components/DropboxFolderControl";
+import CredentialsPanel from "../../components/CredentialsPanel";
 import { getSession } from "../../lib/session";
 import { listUsers, clientsList, connectionsOverview } from "../../lib/db";
 
@@ -11,17 +12,30 @@ const STATUS_FN = "https://jxlrnuyfracyygiksqdj.supabase.co/functions/v1/config-
 const ANON =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4bHJudXlmcmFjeXlnaWtzcWRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MjQ1OTUsImV4cCI6MjA5MDIwMDU5NX0.std1mTdOV4bU4S7wygQ67NdganwPrI6b2HFBi1BXQJ8";
 
-// [env key, label, where it lives, what breaks without it]
+// [env key, label, where it lives, what it powers, how to update]
+const SUPA_SECRET = (name) => [
+  `Supabase → Project jxlrnuyfracyygiksqdj → Edge Functions → Secrets.`,
+  `Add or edit the secret named ${name} and save.`,
+  `Edge functions pick it up on their next invocation — no redeploy needed.`,
+];
+const VERCEL_ENV = (name) => [
+  `Vercel → ormond-hub → Settings → Environment Variables.`,
+  `Set ${name} for Production (and Preview if you use it).`,
+  `Redeploy for the change to take effect (Deployments → ⋯ → Redeploy).`,
+];
 const CREDS = [
-  ["ANTHROPIC_API_KEY", "Anthropic API key", "Supabase secrets", "chat, insights, campaign plans, assistant, summaries"],
-  ["META_ACCESS_TOKEN", "Meta system-user token", "Supabase secrets", "ads data, publishing, listening"],
-  ["META_APP_SECRET", "Meta app secret", "Supabase secrets", "Facebook Login onboarding"],
-  ["GA4_SA_JSON", "GA4 service-account JSON", "Supabase secrets", "legacy GA4 ingest (Slavens)"],
-  ["GOOGLE_OAUTH_CLIENT_ID", "Google OAuth client ID", "Supabase secrets + Vercel env", "Connect with Google"],
-  ["GOOGLE_OAUTH_CLIENT_SECRET", "Google OAuth client secret", "Supabase secrets", "Connect with Google"],
-  ["DROPBOX_APP_KEY", "Dropbox app key", "Supabase secrets + Vercel env", "Dropbox picker"],
-  ["DROPBOX_APP_SECRET", "Dropbox app secret", "Supabase secrets", "Dropbox picker"],
-  ["BRAND_LISTENER_API_KEY", "Brand listener API key", "Supabase secrets", "optional listening providers"],
+  ["ANTHROPIC_API_KEY", "Anthropic API key", "Supabase secrets", "chat, insights, campaign plans, assistant, summaries", SUPA_SECRET("ANTHROPIC_API_KEY")],
+  ["META_ACCESS_TOKEN", "Meta system-user token", "Supabase secrets", "ads data, publishing, AND all Facebook/Instagram brand listening", [
+    "Get a long-lived System User token in Meta Business Settings → Users → System Users (needs pages_read_engagement, pages_manage_posts, instagram_basic, instagram_manage_insights, ads_management).",
+    ...SUPA_SECRET("META_ACCESS_TOKEN"),
+  ]],
+  ["META_APP_SECRET", "Meta app secret", "Supabase secrets", "Facebook Login onboarding", SUPA_SECRET("META_APP_SECRET")],
+  ["GA4_SA_JSON", "GA4 service-account JSON", "Supabase secrets", "legacy GA4 ingest (Slavens)", SUPA_SECRET("GA4_SA_JSON")],
+  ["GOOGLE_OAUTH_CLIENT_ID", "Google OAuth client ID", "Supabase secrets + Vercel env", "Connect with Google", [...SUPA_SECRET("GOOGLE_OAUTH_CLIENT_ID"), "Also set the same value in " + VERCEL_ENV("GOOGLE_OAUTH_CLIENT_ID")[0]]],
+  ["GOOGLE_OAUTH_CLIENT_SECRET", "Google OAuth client secret", "Supabase secrets", "Connect with Google", SUPA_SECRET("GOOGLE_OAUTH_CLIENT_SECRET")],
+  ["DROPBOX_APP_KEY", "Dropbox app key", "Supabase secrets + Vercel env", "Dropbox picker", [...SUPA_SECRET("DROPBOX_APP_KEY"), "Also set the same value in " + VERCEL_ENV("DROPBOX_APP_KEY")[0]]],
+  ["DROPBOX_APP_SECRET", "Dropbox app secret", "Supabase secrets", "Dropbox picker", SUPA_SECRET("DROPBOX_APP_SECRET")],
+  ["DASHBOARD_PASSWORD", "Dashboard password / session key", "Vercel env", "the agency login AND the key that signs every user session — the whole app is locked without it", VERCEL_ENV("DASHBOARD_PASSWORD")],
 ];
 
 export default async function SettingsPage() {
@@ -71,20 +85,8 @@ export default async function SettingsPage() {
 
       <div className="panel">
         <h2>Platform credentials</h2>
-        <p className="note">Status only — values are stored in Supabase Edge Function secrets and Vercel environment variables, never in the app database. A self-serve key editor is planned for the multi-tenant version.</p>
-        <table>
-          <thead><tr><th></th><th>Credential</th><th>Lives in</th><th>Powers</th></tr></thead>
-          <tbody>
-            {CREDS.map(([key, label, where, powers]) => (
-              <tr key={key}>
-                <td>{status[key] === true ? <span className="social-ok">✓</span> : status[key] === false ? <span className="cred-missing">✗</span> : <span className="muted">?</span>}</td>
-                <td><b>{label}</b><div className="muted" style={{ fontSize: 11 }}>{key}</div></td>
-                <td style={{ fontSize: 12.5 }}>{where}</td>
-                <td style={{ fontSize: 12.5 }}>{powers}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <p className="note">Values live in Supabase Edge Function secrets and Vercel environment variables, never in the app database — that keeps secrets out of anything the browser can reach. Click <b>How to update</b> on any row for the exact steps. A self-serve in-app key editor arrives with the multi-tenant version.</p>
+        <CredentialsPanel creds={CREDS} status={status} />
       </div>
 
       <div className="panel" id="team">

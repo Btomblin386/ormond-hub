@@ -1,10 +1,48 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { fileToB64, uploadImage, imageSize, IG_FEED_MIN, IG_FEED_MAX, videoMeta, validateReel } from "../lib/media";
 import DropboxPicker from "./DropboxPicker";
 import ImageEditor from "./ImageEditor";
+
+/* --------- Text formatting (Instagram/Facebook show no markdown, so bold and
+   italic are done with Unicode math alphabet characters that survive posting). */
+function makeMap(fromA, fromZ, toAStart, alsoDigits) {
+  const m = {};
+  for (let c = fromA.charCodeAt(0); c <= fromZ.charCodeAt(0); c++) m[String.fromCharCode(c)] = String.fromCodePoint(toAStart + (c - fromA.charCodeAt(0)));
+  return m;
+}
+const BOLD = { ...makeMap("A", "Z", 0x1d5d4), ...makeMap("a", "z", 0x1d5ee), ...makeMap("0", "9", 0x1d7ec) };
+const ITALIC = { ...makeMap("A", "Z", 0x1d608), ...makeMap("a", "z", 0x1d622) };
+// Reverse map: any styled char -> plain ASCII, so "clear" works and re-styling
+// bold→italic doesn't stack.
+const TO_PLAIN = {};
+for (const [plain, styled] of [...Object.entries(BOLD), ...Object.entries(ITALIC)]) TO_PLAIN[styled] = plain;
+const stripStyle = (s) => [...s].map((ch) => TO_PLAIN[ch] || ch).join("");
+const applyStyle = (s, map) => [...stripStyle(s)].map((ch) => map[ch] || ch).join("");
+
+function FormatBar({ textareaRef, value, onChange }) {
+  function transform(kind) {
+    const el = textareaRef.current;
+    if (!el) return;
+    const start = el.selectionStart ?? 0, end = el.selectionEnd ?? 0;
+    if (start === end) return; // needs a selection
+    const sel = value.slice(start, end);
+    const out = kind === "bold" ? applyStyle(sel, BOLD) : kind === "italic" ? applyStyle(sel, ITALIC) : stripStyle(sel);
+    const next = value.slice(0, start) + out + value.slice(end);
+    onChange(next);
+    requestAnimationFrame(() => { el.focus(); el.setSelectionRange(start, start + [...out].length); });
+  }
+  return (
+    <div className="fmt-bar">
+      <button type="button" title="Bold (select text first)" onClick={() => transform("bold")}><b>B</b></button>
+      <button type="button" title="Italic (select text first)" onClick={() => transform("italic")}><i>I</i></button>
+      <button type="button" title="Clear formatting" onClick={() => transform("clear")}>T×</button>
+      <span className="fmt-hint">select text, then style — works in the live post</span>
+    </div>
+  );
+}
 
 const STATUS_LABEL = {
   draft: "Draft", needs_approval: "Needs approval", needs_revisions: "Needs revisions", approved: "Approved",
@@ -136,6 +174,8 @@ function Composer({ clientId, socials, seedDate, editItem, onDone, dropbox, drop
   const [progress, setProgress] = useState({});
   const [igWarn, setIgWarn] = useState("");
   const [videoWarn, setVideoWarn] = useState("");
+  const sharedRef = useRef(null);
+  const tabRef = useRef(null);
 
   function flash(t) { setMsg(t); setTimeout(() => setMsg(""), 7000); }
   function toggleKey(k) {
@@ -144,6 +184,29 @@ function Composer({ clientId, socials, seedDate, editItem, onDone, dropbox, drop
     if (!selKeys.includes(k)) setActiveTab(ch);
   }
   const setVar = (ch, k, v) => setVariants((s) => ({ ...s, [ch]: { ...s[ch], [k]: v } }));
+
+  // Turning on per-channel editing seeds each channel from what's already in the
+  // shared caption/type, so nothing you've written disappears. Turning it back
+  // off restores the shared caption from whichever channel you were editing.
+  function toggleCustomize(on) {
+    if (on) {
+      setVariants((s) => {
+        const next = { ...s };
+        for (const ch of selChans) {
+          const cur = s[ch] || {};
+          next[ch] = {
+            caption: cur.caption?.trim() ? cur.caption : caption,
+            post_type: cur.post_type || baseType,
+          };
+        }
+        return next;
+      });
+    } else {
+      const src = variants[activeTab]?.caption ?? variants[selChans[0]]?.caption;
+      if (src && !caption.trim()) setCaption(src);
+    }
+    setCustomize(on);
+  }
 
   // effective {caption, type} per selected channel type
   const plan = useMemo(() => selChans.map((ch) => ({
@@ -205,17 +268,20 @@ function Composer({ clientId, socials, seedDate, editItem, onDone, dropbox, drop
     return null;
   }
 
-  async function save(status) {
+  async function save(status, publishNow = false) {
     const err = validate(); if (err) { flash(err); return; }
-    setBusy(status);
+    if (publishNow && !window.confirm("Publish now to the live account(s)? This posts immediately.")) return;
+    setBusy(publishNow ? "now" : status);
     const mediaUrls = usesVideo ? [videoUrl.trim()] : media;
     const payloadVariants = customize
       ? Object.fromEntries(selChans.map((ch) => [ch, { caption: variants[ch]?.caption || "", post_type: variants[ch]?.post_type || "feed" }]))
       : {};
+    // Post Now = approved with an immediate (past) schedule so the publisher grabs it this run.
     const shared = {
       clientId, caption, link: link || null, mediaUrls,
       postType: baseType, variants: payloadVariants, firstComment: firstComment || null,
-      scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+      scheduledAt: publishNow ? new Date().toISOString() : (scheduledAt ? new Date(scheduledAt).toISOString() : null),
+      publishNow,
     };
     // one content item per selected identity
     const groups = [];
@@ -225,7 +291,8 @@ function Composer({ clientId, socials, seedDate, editItem, onDone, dropbox, drop
       if (!g) { g = { socialAccountId: sid, channels: [] }; groups.push(g); }
       if (!g.channels.includes(ch)) g.channels.push(ch);
     }
-    const label = status === "draft" ? "Saved as draft." : status === "needs_approval" ? "Submitted for approval." : "Approved & scheduled.";
+    const effStatus = publishNow ? "approved" : status;
+    const label = publishNow ? "Publishing now…" : status === "draft" ? "Saved as draft." : status === "needs_approval" ? "Submitted for approval." : "Approved & scheduled.";
     try {
       let firstErr = null;
       for (let i = 0; i < groups.length; i++) {
@@ -235,11 +302,11 @@ function Composer({ clientId, socials, seedDate, editItem, onDone, dropbox, drop
           const r1 = await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "update", id: editItem.id, ...shared, channels: g.channels, socialAccountId: g.socialAccountId }) });
           d = await r1.json();
           if (!d.error) {
-            const r2 = await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "status", id: editItem.id, status, approvedBy: "agency" }) });
+            const r2 = await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "status", id: editItem.id, status: effStatus, approvedBy: "agency", publishNow }) });
             d = await r2.json();
           }
         } else {
-          const r = await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "create", ...shared, channels: g.channels, socialAccountId: g.socialAccountId, status }) });
+          const r = await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "create", ...shared, channels: g.channels, socialAccountId: g.socialAccountId, status: effStatus }) });
           d = await r.json();
         }
         if (d.error && !firstErr) firstErr = d.error;
@@ -261,7 +328,7 @@ function Composer({ clientId, socials, seedDate, editItem, onDone, dropbox, drop
         </div>
         {selChans.length > 1 && (
           <label className="cmp-toggle">
-            <input type="checkbox" checked={customize} onChange={(e) => setCustomize(e.target.checked)} /> Customize per channel
+            <input type="checkbox" checked={customize} onChange={(e) => toggleCustomize(e.target.checked)} /> Customize per channel
           </label>
         )}
       </div>
@@ -273,7 +340,8 @@ function Composer({ clientId, socials, seedDate, editItem, onDone, dropbox, drop
               <label>Caption</label>
               <CharCount value={caption} channels={selChans} />
             </div>
-            <textarea rows={5} value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Write the post…" />
+            <FormatBar textareaRef={sharedRef} value={caption} onChange={setCaption} />
+            <textarea ref={sharedRef} rows={5} value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Write the post…" />
           </div>
           <div className="cmp-field">
             <label>Post type</label>
@@ -291,7 +359,8 @@ function Composer({ clientId, socials, seedDate, editItem, onDone, dropbox, drop
                 <label>{CHAN_LABEL[ch]} caption</label>
                 <span className={"charcount" + ((variants[ch]?.caption || "").length > LIMITS[ch] ? " over" : "")}>{(variants[ch]?.caption || "").length}/{LIMITS[ch].toLocaleString()}</span>
               </div>
-              <textarea rows={5} value={variants[ch]?.caption || ""} onChange={(e) => setVar(ch, "caption", e.target.value)} placeholder={ch === "instagram" ? "IG caption — @mentions, #hashtags…" : "Facebook caption…"} />
+              <FormatBar textareaRef={tabRef} value={variants[ch]?.caption || ""} onChange={(v) => setVar(ch, "caption", v)} />
+              <textarea ref={tabRef} rows={5} value={variants[ch]?.caption || ""} onChange={(e) => setVar(ch, "caption", e.target.value)} placeholder={ch === "instagram" ? "IG caption — @mentions, #hashtags…" : "Facebook caption…"} />
               <div style={{ marginTop: 8 }}><label>Post type</label><TypePicker value={variants[ch]?.post_type || "feed"} onChange={(v) => setVar(ch, "post_type", v)} /></div>
             </div>
           ))}
@@ -374,6 +443,7 @@ function Composer({ clientId, socials, seedDate, editItem, onDone, dropbox, drop
         <button className="cmp-btn ghost" onClick={() => save("draft")} disabled={!!busy}>Save draft</button>
         <button className="cmp-btn outline" onClick={() => save("needs_approval")} disabled={!!busy}>Submit for approval</button>
         <button className="cmp-btn solid" onClick={() => save("approved")} disabled={!!busy}>{busy === "approved" ? "Scheduling…" : "Approve & schedule"}</button>
+        <button className="cmp-btn now" onClick={() => save("approved", true)} disabled={!!busy} title="Publish immediately to the live account(s)">{busy === "now" ? "Publishing…" : "⚡ Post now"}</button>
       </div>
     </div>
   );

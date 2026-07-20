@@ -14,6 +14,11 @@ function fmtTime(iso) {
   if (!iso) return "";
   return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
+// ISO -> value for <input type="datetime-local"> in the viewer's local zone.
+function toLocalInput(iso) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 function fmtDay(key) {
   return new Date(key + "T00:00:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 }
@@ -33,7 +38,16 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
   const [overKey, setOverKey] = useState(null);
   const [qCaption, setQCaption] = useState("");
   const [qNote, setQNote] = useState("");
-  useEffect(() => { setQCaption(sel?.caption || ""); setQNote(sel?.note || ""); }, [sel]);
+  const [qWhen, setQWhen] = useState("");
+  useEffect(() => { setQCaption(sel?.caption || ""); setQNote(sel?.note || ""); setQWhen(sel?.scheduled_at ? toLocalInput(sel.scheduled_at) : ""); }, [sel]);
+
+  async function saveQuickTime() {
+    setBusy("q");
+    try {
+      await post("reschedule", { id: sel.id, scheduledAt: qWhen ? new Date(qWhen).toISOString() : null });
+      setSel(null);
+    } finally { setBusy(""); }
+  }
 
   async function post(op, body, api = "/api/content") {
     await fetch(api, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op, ...body }) });
@@ -328,6 +342,11 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
               <div className="cal-modal-cap">{sel.caption || "(no caption)"}</div>
             ) : (
               <div className="cal-quick">
+                <label>Scheduled time</label>
+                <div className="cal-time-row">
+                  <input type="datetime-local" value={qWhen} onChange={(e) => setQWhen(e.target.value)} />
+                  <button className="social-btn" disabled={busy === "q" || qWhen === (sel.scheduled_at ? toLocalInput(sel.scheduled_at) : "")} onClick={saveQuickTime}>Update time</button>
+                </div>
                 <label>Caption</label>
                 <textarea rows={3} value={qCaption} onChange={(e) => setQCaption(e.target.value)} />
                 <label>Note {sel.status === "needs_revisions" ? "· revisions requested" : "(for the team)"}</label>
