@@ -373,6 +373,7 @@ td a.rowlink { color: #4338ca; font-weight: 600; }
 .acctsel-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 999px; color: #fff; }
 .acctsel-chip.facebook { background: #1877f2; }
 .acctsel-chip.instagram { background: #d6249f; }
+.acctsel-chip.tiktok { background: #010101; }
 .acctsel-x { cursor: pointer; font-size: 13px; line-height: 1; opacity: .85; }
 .acctsel-caret { color: #9ca3af; font-size: 11px; }
 .acctsel-menu { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 20; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 12px 30px rgba(0,0,0,.14); padding: 6px; }

@@ -48,8 +48,8 @@ const STATUS_LABEL = {
   draft: "Draft", needs_approval: "Needs approval", needs_revisions: "Needs revisions", approved: "Approved",
   scheduled: "Scheduled", publishing: "Publishing", published: "Published", failed: "Failed",
 };
-const LIMITS = { instagram: 2200, facebook: 63206 };
-const CHAN_LABEL = { facebook: "Facebook", instagram: "Instagram" };
+const LIMITS = { instagram: 2200, facebook: 63206, tiktok: 2200 };
+const CHAN_LABEL = { facebook: "Facebook", instagram: "Instagram", tiktok: "TikTok" };
 const TYPES = ["feed", "reel", "story"];
 
 /* ---------------- Social connection ---------------- */
@@ -125,16 +125,18 @@ function toLocalInput(iso) {
 // Selection keys are "<socialId>:<channel>" so one composer can target several
 // connected identities (e.g. two Pages under one client). On save, keys are
 // grouped by identity into one content item per identity.
-function buildOptions(socials) {
+function buildOptions(socials, tiktok) {
   const out = [];
   for (const s of socials) {
     if (s.fb_page_id) out.push({ key: `${s.id}:facebook`, socialId: s.id, ch: "facebook", label: s.fb_page_name || "Facebook Page", handle: "Facebook" });
     if (s.ig_user_id) out.push({ key: `${s.id}:instagram`, socialId: s.id, ch: "instagram", label: s.ig_username ? "@" + s.ig_username : "Instagram", handle: "Instagram" });
   }
+  // TikTok is one identity per brand (separate table), video-only, drafts-upload.
+  if (tiktok) out.push({ key: "tiktok:tiktok", socialId: "tiktok", ch: "tiktok", label: tiktok.username ? "@" + tiktok.username : (tiktok.display_name || "TikTok"), handle: "TikTok" });
   return out;
 }
 
-function Composer({ clientId, socials, seedDate, editItem, onDone, dropbox, dropboxFolder, brandLogo }) {
+function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, dropbox, dropboxFolder, brandLogo }) {
   const router = useRouter();
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
@@ -142,12 +144,12 @@ function Composer({ clientId, socials, seedDate, editItem, onDone, dropbox, drop
   const [dbxOpen, setDbxOpen] = useState(false);
   const [dbxFolder, setDbxFolder] = useState(dropboxFolder || "");
   const [dragOver, setDragOver] = useState(false);
-  const options = useMemo(() => buildOptions(socials), [socials]);
+  const options = useMemo(() => buildOptions(socials, tiktok), [socials, tiktok]);
 
   const [selKeys, setSelKeys] = useState(() => {
     if (editItem) {
       const sid = editItem.social_account_id || socials[0]?.id;
-      return (editItem.channels || []).map((ch) => `${sid}:${ch}`).filter((k) => options.some((o) => o.key === k));
+      return (editItem.channels || []).map((ch) => (ch === "tiktok" ? "tiktok:tiktok" : `${sid}:${ch}`)).filter((k) => options.some((o) => o.key === k));
     }
     // default: every channel of the primary identity
     const primary = socials[0]?.id;
@@ -208,15 +210,17 @@ function Composer({ clientId, socials, seedDate, editItem, onDone, dropbox, drop
     setCustomize(on);
   }
 
-  // effective {caption, type} per selected channel type
+  // effective {caption, type} per selected channel type. TikTok is always a
+  // single video (no feed/reel/story choice), so it forces the video path.
   const plan = useMemo(() => selChans.map((ch) => ({
     ch,
     caption: customize ? (variants[ch]?.caption || "") : caption,
-    type: customize ? (variants[ch]?.post_type || "feed") : baseType,
+    type: ch === "tiktok" ? "tiktok" : (customize ? (variants[ch]?.post_type || "feed") : baseType),
   })), [selChans, customize, variants, caption, baseType]);
 
-  const usesVideo = plan.some((p) => p.type === "reel");
+  const usesVideo = plan.some((p) => p.type === "reel" || p.ch === "tiktok");
   const usesImage = plan.some((p) => p.type === "feed" || p.type === "story");
+  const ttActive = selChans.includes("tiktok");
 
   useEffect(() => {
     if (!usesVideo || !videoUrl.trim()) { setVideoWarn(""); return; }
@@ -251,9 +255,10 @@ function Composer({ clientId, socials, seedDate, editItem, onDone, dropbox, drop
 
   function validate() {
     if (!selKeys.length) return "Pick at least one account.";
-    if (usesVideo && usesImage) return "Mixing Reel (video) with Feed/Story (image) in one post isn't supported — make separate posts.";
+    if (usesVideo && usesImage) return "TikTok and Reels are video; Feed/Story are images — they can't share one post. Make separate posts.";
     for (const p of plan) {
       if (p.caption.length > LIMITS[p.ch]) return `${CHAN_LABEL[p.ch]} caption is over the ${LIMITS[p.ch].toLocaleString()}-character limit.`;
+      if (p.ch === "tiktok" && !videoUrl.trim()) return "TikTok posts need a video URL (TikTok is video only).";
       if (p.ch === "instagram") {
         if (p.type === "reel" && !videoUrl.trim()) return "Instagram Reels need a video URL.";
         if (p.type !== "reel" && media.length === 0) return "Instagram posts need at least one image.";
@@ -283,12 +288,15 @@ function Composer({ clientId, socials, seedDate, editItem, onDone, dropbox, drop
       scheduledAt: publishNow ? new Date().toISOString() : (scheduledAt ? new Date(scheduledAt).toISOString() : null),
       publishNow,
     };
-    // one content item per selected identity
+    // one content item per selected identity; TikTok has no Meta social_accounts
+    // row, so its group saves with socialAccountId null (publisher looks it up by
+    // client_id).
     const groups = [];
     for (const k of selKeys) {
       const [sid, ch] = k.split(":");
-      let g = groups.find((x) => x.socialAccountId === sid);
-      if (!g) { g = { socialAccountId: sid, channels: [] }; groups.push(g); }
+      const groupSid = sid === "tiktok" ? null : sid;
+      let g = groups.find((x) => x.socialAccountId === groupSid);
+      if (!g) { g = { socialAccountId: groupSid, channels: [] }; groups.push(g); }
       if (!g.channels.includes(ch)) g.channels.push(ch);
     }
     const effStatus = publishNow ? "approved" : status;
@@ -360,8 +368,8 @@ function Composer({ clientId, socials, seedDate, editItem, onDone, dropbox, drop
                 <span className={"charcount" + ((variants[ch]?.caption || "").length > LIMITS[ch] ? " over" : "")}>{(variants[ch]?.caption || "").length}/{LIMITS[ch].toLocaleString()}</span>
               </div>
               <FormatBar textareaRef={tabRef} value={variants[ch]?.caption || ""} onChange={(v) => setVar(ch, "caption", v)} />
-              <textarea ref={tabRef} rows={5} value={variants[ch]?.caption || ""} onChange={(e) => setVar(ch, "caption", e.target.value)} placeholder={ch === "instagram" ? "IG caption — @mentions, #hashtags…" : "Facebook caption…"} />
-              <div style={{ marginTop: 8 }}><label>Post type</label><TypePicker value={variants[ch]?.post_type || "feed"} onChange={(v) => setVar(ch, "post_type", v)} /></div>
+              <textarea ref={tabRef} rows={5} value={variants[ch]?.caption || ""} onChange={(e) => setVar(ch, "caption", e.target.value)} placeholder={ch === "instagram" ? "IG caption — @mentions, #hashtags…" : ch === "tiktok" ? "TikTok caption — becomes the video description in drafts…" : "Facebook caption…"} />
+              {ch !== "tiktok" && <div style={{ marginTop: 8 }}><label>Post type</label><TypePicker value={variants[ch]?.post_type || "feed"} onChange={(v) => setVar(ch, "post_type", v)} /></div>}
             </div>
           ))}
         </div>
@@ -369,9 +377,10 @@ function Composer({ clientId, socials, seedDate, editItem, onDone, dropbox, drop
 
       {usesVideo ? (
         <div className="cmp-field">
-          <label>Video URL (Reel)</label>
+          <label>Video URL {ttActive ? "(Reel / TikTok)" : "(Reel)"}</label>
           <input type="url" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://…/video.mp4 (public MP4)" />
-          <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>Reels publish from a public MP4 URL. Instagram: ≤ 90s, 9:16, 1080px wide. Direct upload coming soon.</div>
+          <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>Publishes from a public MP4 URL. Instagram: ≤ 90s, 9:16, 1080px wide. Direct upload coming soon.</div>
+          {ttActive && <div className="cmp-warn" style={{ background: "#f5f3ff", borderColor: "#ddd6fe", color: "#5b21b6" }}>ℹ TikTok sends the video to the brand&apos;s TikTok <b>drafts</b> — someone finishes posting in the TikTok app (where they can add music &amp; effects). Direct-to-feed unlocks after TikTok approves the app.</div>}
           {videoWarn && <div className="cmp-warn">⚠ {videoWarn}</div>}
         </div>
       ) : (
@@ -505,7 +514,7 @@ function TypePicker({ value, onChange }) {
 }
 
 /* ---------------- Main ---------------- */
-export default function ContentManager({ clientId, client, items, socials, open: openProp, setOpen: setOpenProp, seedDate, editId, dropbox, dropboxFolder, brandLogo }) {
+export default function ContentManager({ clientId, client, items, socials, tiktok, open: openProp, setOpen: setOpenProp, seedDate, editId, dropbox, dropboxFolder, brandLogo }) {
   const router = useRouter();
   const [openLocal, setOpenLocal] = useState(false);
   const open = openProp !== undefined ? openProp : openLocal;
@@ -589,7 +598,7 @@ export default function ContentManager({ clientId, client, items, socials, open:
       {open && (
         <>
           {editItem && <div className="cmp-editing">Editing an existing {STATUS_LABEL[editItem.status]?.toLowerCase()} post</div>}
-          <Composer key={editItem?.id || "new"} clientId={clientId} socials={socials} seedDate={seedDate} editItem={editItem} dropbox={dropbox} dropboxFolder={dropboxFolder} brandLogo={brandLogo} onDone={(m) => { flash(m); setOpen(false); setEditItem(null); }} />
+          <Composer key={editItem?.id || "new"} clientId={clientId} socials={socials} tiktok={tiktok} seedDate={seedDate} editItem={editItem} dropbox={dropbox} dropboxFolder={dropboxFolder} brandLogo={brandLogo} onDone={(m) => { flash(m); setOpen(false); setEditItem(null); }} />
         </>
       )}
 

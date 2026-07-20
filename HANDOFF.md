@@ -120,6 +120,25 @@ Also requested (not yet scheduled):
 - Push/email alerts for approvals + missed schedules (currently in-app notifications only).
 - Full top-nav conversion (OneUp-style) — layout is widened but nav still left-rail.
 
+## Recently shipped (2026-07-21, TikTok organic publishing — drafts-upload path)
+- TikTok is a **third content channel** (`"tiktok"` in `content_items.channels`), video-only, publishing via the **drafts-upload** path (no app audit needed): video → the brand's TikTok drafts, they finish posting in the TikTok app (also lets them add native music/effects). Flips to direct-to-feed later with a one-line change once TikTok audits the app.
+- **Schema:** new `tiktok_accounts` (per-client, unique client_id: open_id, username, tokens, expiry, scopes) + `content_items.tiktok_publish_id`.
+- **Edge fns:** `oauth-tiktok` (exchange/status/disconnect/creator_info, token refresh) + `content-publish v13` (tiktok branch: looks up the client's TikTok, refreshes token, POSTs video to `/v2/post/publish/inbox/video/init/` via PULL_FROM_URL; a tiktok-only post needs NO Meta social_accounts row — `needsMeta` gate). Secrets: `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`.
+- **Routes:** `/api/oauth/tiktok/start` (per-brand, `?client=<uuid>&return=<path>`, scopes user.info.basic,video.upload) + `/callback` + `/api/tiktok` proxy (agency-gated). Both login pages already public; tiktok OAuth is under /api/oauth (agency).
+- **Composer:** TikTok appears as an account option when connected (buildOptions, key `tiktok:tiktok`, socialId sentinel `"tiktok"` → saved with social_account_id NULL). Video-only (forces the video-URL path, no feed/reel/story picker), caption limit 2200, its own group in save. Purple info banner explains the drafts flow.
+- **UI:** connect/disconnect on each account's Settings tab (TikTok panel); global Settings credentials list gains TIKTOK_CLIENT_KEY/SECRET with how-to steps. Dropped the unused BRAND_LISTENER_API_KEY from config-status.
+- **NOT yet testable end-to-end** — needs Brooks to create the TikTok app + set the two secrets. Verified: edge fns return a clean "not configured" error, config-status reflects the keys, build passes.
+
+### TikTok setup steps (Brooks — one-time, per the developer portal)
+1. **developers.tiktok.com** → create an app. Add products **Login Kit** + **Content Posting API**.
+2. Content Posting API config: enable it; for now the **drafts/inbox upload** works unaudited. (Direct Post needs the app submitted for audit — do that later to post straight to feed.)
+3. **Redirect URI:** `https://ormond-hub.vercel.app/api/oauth/tiktok/callback`
+4. **Scopes:** `user.info.basic`, `video.upload`.
+5. **Media domain verification:** PULL_FROM_URL requires the video host be verified — add & verify `jxlrnuyfracyygiksqdj.supabase.co` (our storage bucket) in the portal's URL properties. (If TikTok won't verify a bucket subdomain, switch the publisher to FILE_UPLOAD — noted as the fallback.)
+6. Copy **Client key** + **Client secret** → set `TIKTOK_CLIENT_KEY` and `TIKTOK_CLIENT_SECRET` in Supabase secrets; also put `TIKTOK_CLIENT_KEY` in Vercel env (the start route reads it). Redeploy.
+7. Per brand: Account → Settings → **TikTok → Connect**, authorize with that brand's TikTok login.
+8. Compose: pick the TikTok account, add a public MP4 URL, approve/schedule → video lands in their TikTok drafts.
+
 ## Recently shipped (2026-07-20 later, SECURITY fail-closed + composer/calendar/team/notifications batch)
 - **CRITICAL SECURITY (shipped first, ecd4ebf + cd6d457):** the whole app was reachable **without login** — `DASHBOARD_PASSWORD` is unset in Vercel, so `undefined === undefined` (missing env === missing cookie) granted anonymous **agency** access in three places: middleware.js, lib/session.js `getSession`, and lib/auth.js used a `"dev-secret"` fallback that could forge tokens. All three now **fail closed**: empty secret matches nothing, `signSession` throws, middleware redirects to `/login?e=cfg`. **ACTION REQUIRED: set `DASHBOARD_PASSWORD` in Vercel → Settings → Env Vars (Production) and redeploy** — until then nobody (including Brooks) can log in. Agency login = blank email + that password. Verified in prod: `/accounts`→`/login?e=cfg`, `/` shows landing only, no client names leak; verified locally with the secret set that valid cookie→200, wrong/no cookie→307.
 - **Composer customize-per-channel wipe fixed:** toggling "Customize per channel" built per-channel captions from empty `variants` state, erasing what was typed. Now `toggleCustomize` seeds each channel from the shared caption/type on, and restores the shared caption on off.

@@ -35,6 +35,12 @@ const CREDS = [
   ["GOOGLE_OAUTH_CLIENT_SECRET", "Google OAuth client secret", "Supabase secrets", "Connect with Google", SUPA_SECRET("GOOGLE_OAUTH_CLIENT_SECRET")],
   ["DROPBOX_APP_KEY", "Dropbox app key", "Supabase secrets + Vercel env", "Dropbox picker", [...SUPA_SECRET("DROPBOX_APP_KEY"), "Also set the same value in " + VERCEL_ENV("DROPBOX_APP_KEY")[0]]],
   ["DROPBOX_APP_SECRET", "Dropbox app secret", "Supabase secrets", "Dropbox picker", SUPA_SECRET("DROPBOX_APP_SECRET")],
+  ["TIKTOK_CLIENT_KEY", "TikTok client key", "Supabase secrets + Vercel env", "Connect TikTok + video publishing to drafts", [
+    "In the TikTok for Developers portal, open your app → Basic information for the Client key.",
+    ...SUPA_SECRET("TIKTOK_CLIENT_KEY"),
+    "Also set the same value in " + VERCEL_ENV("TIKTOK_CLIENT_KEY")[0] + " (the OAuth start route reads it).",
+  ]],
+  ["TIKTOK_CLIENT_SECRET", "TikTok client secret", "Supabase secrets", "TikTok token exchange + refresh", SUPA_SECRET("TIKTOK_CLIENT_SECRET")],
   ["DASHBOARD_PASSWORD", "Dashboard password / session key", "Vercel env", "the agency login AND the key that signs every user session — the whole app is locked without it", VERCEL_ENV("DASHBOARD_PASSWORD")],
 ];
 

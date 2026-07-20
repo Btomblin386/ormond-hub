@@ -1,14 +1,15 @@
 "use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 async function post(url, body) {
   const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   return r.json();
 }
 
-export default function AccountSettings({ acct, socials, ga4, brand, dropboxEmail }) {
+export default function AccountSettings({ acct, socials, tiktok, ga4, brand, dropboxEmail }) {
   const router = useRouter();
+  const search = useSearchParams();
   const [name, setName] = useState(acct.client);
   const [desc, setDesc] = useState(brand?.business_desc || "");
   const [cap, setCap] = useState(acct.max_daily_budget ?? "");
@@ -17,6 +18,22 @@ export default function AccountSettings({ acct, socials, ga4, brand, dropboxEmai
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
   function flash(t) { setMsg(t); setTimeout(() => setMsg(""), 6000); }
+
+  // Surface the TikTok OAuth callback result (?tt_ok / ?tt_error).
+  useEffect(() => {
+    const ok = search.get("tt_ok"), e = search.get("tt_error");
+    if (ok) flash(`TikTok connected as @${ok}.`);
+    else if (e) flash("TikTok error: " + e);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const ttStart = `/api/oauth/tiktok/start?client=${acct.client_id}&return=${encodeURIComponent(`/accounts/${acct.id}/settings`)}`;
+  async function disconnectTikTok() {
+    if (!window.confirm("Disconnect TikTok for this brand?")) return;
+    setBusy("tt");
+    try { await post("/api/tiktok", { action: "disconnect", client_id: acct.client_id }); router.refresh(); }
+    finally { setBusy(""); }
+  }
 
   async function run(key, fn, { reload } = {}) {
     setBusy(key);
@@ -86,6 +103,21 @@ export default function AccountSettings({ acct, socials, ga4, brand, dropboxEmai
           </div>
         ))}
         <a className="social-btn" style={{ display: "inline-block", textDecoration: "none", marginTop: 6 }} href="/onboard">+ Connect a Page</a>
+      </div>
+
+      <div className="panel">
+        <h2>TikTok</h2>
+        <p className="note">Post video to this brand&apos;s TikTok. Videos land in the account&apos;s TikTok <b>drafts</b> — someone finishes posting in the app (and can add music/effects there). Direct-to-feed unlocks once TikTok approves the app.</p>
+        {tiktok ? (
+          <div className="set-conn">
+            <span className="social-ok">✓</span>
+            <span className="set-conn-name">{tiktok.username ? "@" + tiktok.username : (tiktok.display_name || "Connected")}</span>
+            <a className="social-btn" style={{ textDecoration: "none", marginLeft: "auto" }} href={ttStart}>Reconnect</a>
+            <button className="rule-del" disabled={busy === "tt"} onClick={disconnectTikTok}>Disconnect</button>
+          </div>
+        ) : (
+          <a className="social-btn" style={{ display: "inline-block", textDecoration: "none" }} href={ttStart}>+ Connect TikTok</a>
+        )}
       </div>
 
       <div className="panel">
