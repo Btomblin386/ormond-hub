@@ -120,6 +120,12 @@ Also requested (not yet scheduled):
 - Push/email alerts for approvals + missed schedules (currently in-app notifications only).
 - Full top-nav conversion (OneUp-style) — layout is widened but nav still left-rail.
 
+## Recently shipped (2026-07-21 later, media proxy on verified domain for TikTok pull)
+- TikTok PULL_FROM_URL requires the video HOST be a domain verified in the TikTok portal. We verified `ormond-hub.vercel.app` (URL-prefix signature file at /public/tiktok…​.txt), NOT the Supabase storage domain — so **content-publish v16** routes the TikTok video URL through `${APP_BASE}/api/media?u=<encoded>` (proxied()). Same-domain URLs pass through untouched.
+- **`/api/media` proxy** (app/api/media/route.js): public (in middleware PUBLIC), streams `u` with Range forwarding. NOT an open proxy — it only serves a URL that `mediaUrlExists()` finds in a live content_item's media_urls, and only https to a non-private host (SSRF guard). Works for Supabase-hosted AND pasted-CDN video URLs.
+- **Gotchas fixed:** setting `cache-control: public` made Vercel's CDN cache/normalize ranged responses (a full 200 body served against a Range → corruption); switched to `no-store` and explicitly preserve 206 when upstream honors the Range. Verified on prod: full→200 (full length), Range→206 (partial), unknown URL→404, private/non-https→403, no login redirect.
+- Signature file committed at `public/tiktokXbOyeI52NV368bqme8rnNNMx09MApcxC.txt`; middleware lets any `/tiktok*.txt` bypass auth. TikTok app SUBMITTED for review; keys set in Supabase+Vercel.
+
 ## Recently shipped (2026-07-21, TikTok organic publishing — drafts-upload path)
 - TikTok is a **third content channel** (`"tiktok"` in `content_items.channels`), video-only, publishing via the **drafts-upload** path (no app audit needed): video → the brand's TikTok drafts, they finish posting in the TikTok app (also lets them add native music/effects). Flips to direct-to-feed later with a one-line change once TikTok audits the app.
 - **Schema:** new `tiktok_accounts` (per-client, unique client_id: open_id, username, tokens, expiry, scopes) + `content_items.tiktok_publish_id`.
