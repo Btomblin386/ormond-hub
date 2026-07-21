@@ -325,7 +325,8 @@ td a.rowlink { color: #4338ca; font-weight: 600; }
 .social-status.connected { background: #f0fdf4; border-color: #bbf7d0; }
 .social-ok { color: #15803d; font-weight: 600; }
 .social-ig { color: #be185d; font-weight: 600; }
-.social-btn { border: 1px solid #d1d5db; background: #fff; font-size: 12px; padding: 5px 11px; border-radius: 8px; cursor: pointer; }
+.social-btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #d1d5db; background: #fff; color: #111827; font-size: 12px; font-weight: 500; padding: 6px 12px; border-radius: 8px; cursor: pointer; transition: background .12s, border-color .12s; }
+.social-btn:hover:not(:disabled) { background: #f5f7ff; border-color: #c7d2fe; }
 .page-picker { display: flex; flex-direction: column; gap: 4px; width: 100%; margin-top: 6px; }
 .page-opt { border: 1px solid #d1d5db; background: #fff; text-align: left; font-size: 12.5px; padding: 7px 10px; border-radius: 8px; cursor: pointer; }
 .page-opt:hover { background: #f5f7ff; }
@@ -338,6 +339,20 @@ td a.rowlink { color: #4338ca; font-weight: 600; }
 .cmp-field > label { display: block; font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 5px; }
 .cmp-field textarea, .cmp-field input[type="url"], .cmp-field input[type="datetime-local"] { width: 100%; padding: 9px 11px; border: 1px solid #d1d5db; border-radius: 9px; font-size: 13px; font-family: inherit; }
 .cmp-field textarea { resize: vertical; }
+/* Styled file picker + consistent secondary buttons */
+.file-btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #d1d5db; background: #fff; color: #111827; font-size: 12px; font-weight: 500; padding: 6px 12px; border-radius: 8px; cursor: pointer; transition: background .12s, border-color .12s; }
+.file-btn:hover { background: #f5f7ff; border-color: #c7d2fe; }
+.file-btn.disabled { opacity: .55; cursor: default; pointer-events: none; }
+.cmp-thumb-col { display: flex; flex-direction: column; gap: 5px; align-items: center; }
+.studio-edit-btn { display: inline-flex; align-items: center; gap: 5px; border: 1px solid #d1d5db; background: #fff; color: #4338ca; font-size: 11px; font-weight: 500; padding: 4px 9px; border-radius: 7px; cursor: pointer; transition: background .12s, border-color .12s; }
+.studio-edit-btn:hover { background: #eef2ff; border-color: #a5b4fc; }
+.cmp-add { display: inline-flex; align-items: center; gap: 6px; border: 1px dashed #cbd5e1; background: #fff; color: #4338ca; font-size: 12.5px; font-weight: 500; padding: 8px 12px; border-radius: 8px; cursor: pointer; margin: 0 8px 14px 0; transition: background .12s, border-color .12s; }
+.cmp-add:hover { background: #eef2ff; border-color: #a5b4fc; }
+.cmp-collapse { border: 0; background: none; color: #6b7280; font-size: 11.5px; cursor: pointer; text-decoration: underline; padding: 0; }
+.content-thumb.clickable { cursor: pointer; transition: transform .1s, box-shadow .1s; }
+.content-thumb.clickable:hover { transform: scale(1.05); box-shadow: 0 2px 10px rgba(0,0,0,.18); }
+.content-cap.clickable { cursor: pointer; }
+.content-cap.clickable:hover { text-decoration: underline; }
 .cmp-label-row { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 5px; }
 .cmp-label-row label { font-size: 12px; font-weight: 600; color: #374151; }
 .charcount { font-size: 11px; color: #9ca3af; }

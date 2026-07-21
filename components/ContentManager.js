@@ -57,6 +57,19 @@ function isVideoUrl(u) {
   catch { return /\.(mp4|mov|m4v|webm|avi|mkv)(\?|$)/i.test(u); }
 }
 
+// Styled file picker: the native <input type=file> button can't be restyled, so
+// we hide it behind a label that matches the app's other buttons. Resets its
+// value after each pick so choosing the same file again still fires onChange.
+function FileButton({ accept, multiple, onChange, disabled, children }) {
+  return (
+    <label className={"file-btn" + (disabled ? " disabled" : "")}>
+      {children}
+      <input type="file" accept={accept} multiple={multiple} disabled={disabled}
+        onChange={(e) => { onChange(e); e.target.value = ""; }} style={{ display: "none" }} />
+    </label>
+  );
+}
+
 /* ---------------- Social connection ---------------- */
 function SocialConnect({ clientId, client, socials }) {
   const router = useRouter();
@@ -193,6 +206,8 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
   const sharedRef = useRef(null);
   const tabRef = useRef(null);
   const [restored, setRestored] = useState(false);
+  const [showLink, setShowLink] = useState(false);
+  const [showFirst, setShowFirst] = useState(false);
   const hydratedRef = useRef(false);
   const draftKey = `hub:composer:${clientId}`;
 
@@ -498,7 +513,7 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
             <span className="muted" style={{ fontSize: 11 }}>≤ 90s, 9:16, 1080px wide</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <input type="file" accept="video/*" onChange={onVideoInput} disabled={vUploading} />
+            <FileButton accept="video/*" onChange={onVideoInput} disabled={vUploading}>🎬 Choose video</FileButton>
           </div>
           {vUploading && (
             <div className="upl-prog">
@@ -519,7 +534,7 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
             <div style={{ marginTop: 12 }}>
               <label>Cover photo <span className="muted">(optional — the {reelActive ? "Reel" : "video"} thumbnail{selChans.includes("instagram") ? " on Instagram" : ""})</span></label>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
-                <input type="file" accept="image/*" onChange={onCoverInput} disabled={cUploading} />
+                <FileButton accept="image/*" onChange={onCoverInput} disabled={cUploading}>🖼 Choose cover</FileButton>
                 {cUploading && <span className="muted" style={{ fontSize: 11 }}>Uploading…</span>}
                 {coverUrl && !cUploading && (
                   <div className="cmp-thumb" style={{ width: 60, height: 60 }}>
@@ -541,10 +556,9 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
           onDrop={(e) => { e.preventDefault(); setDragOver(false); uploadFiles([...e.dataTransfer.files]); }}>
           <div className="cmp-label-row">
             <label>Images {igActive && <span className="muted">· 1 for a Story, up to 10 for a carousel · or drag &amp; drop here</span>}</label>
-            <span className="muted" style={{ fontSize: 11 }}>✎ on a thumbnail opens the editor (crop, filters, logo)</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <input type="file" accept="image/*" multiple onChange={onFiles} disabled={uploading} />
+            <FileButton accept="image/*" multiple onChange={onFiles} disabled={uploading}>🖼 Choose image{"(s)"}</FileButton>
             {dropbox && <button type="button" className="social-btn" onClick={() => setDbxOpen(true)}>📦 Add from Dropbox</button>}
           </div>
           {dbxOpen && <DropboxPicker clientId={clientId} startPath={dbxFolder} onDefaultSaved={(p) => setDbxFolder(p)} onAdd={(url) => setMedia((m) => [...m, url])} onClose={() => setDbxOpen(false)} />}
@@ -558,10 +572,12 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
           {media.length > 0 && (
             <div className="cmp-thumbs">
               {media.map((u, j) => (
-                <div key={j} className="cmp-thumb">
-                  <img src={u} alt="" />
-                  <button type="button" onClick={() => setMedia((m) => m.filter((_, i) => i !== j))}>×</button>
-                  <button type="button" className="thumb-edit" title="Edit image" onClick={() => setEditorIdx(j)}>✎</button>
+                <div key={j} className="cmp-thumb-col">
+                  <div className="cmp-thumb">
+                    <img src={u} alt="" />
+                    <button type="button" onClick={() => setMedia((m) => m.filter((_, i) => i !== j))}>×</button>
+                  </div>
+                  <button type="button" className="studio-edit-btn" onClick={() => setEditorIdx(j)}>✎ Edit in Studio</button>
                 </div>
               ))}
             </div>
@@ -581,16 +597,30 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
       )}
 
       {plan.some((p) => p.ch === "facebook" && p.type === "feed") && (
-        <div className="cmp-field">
-          <label>Link <span className="muted">(Facebook feed only)</span></label>
-          <input type="url" value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://…" />
-        </div>
+        (showLink || link) ? (
+          <div className="cmp-field">
+            <div className="cmp-label-row">
+              <label>Link <span className="muted">(Facebook feed only)</span></label>
+              <button type="button" className="cmp-collapse" onClick={() => { setLink(""); setShowLink(false); }}>Remove</button>
+            </div>
+            <input type="url" value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://…" />
+          </div>
+        ) : (
+          <button type="button" className="cmp-add" onClick={() => setShowLink(true)}>+ Add a link <span className="muted" style={{ fontWeight: 400 }}>(Facebook feed only)</span></button>
+        )
       )}
 
-      <div className="cmp-field">
-        <label>First comment <span className="muted">(optional — posted right after)</span></label>
-        <textarea rows={2} value={firstComment} onChange={(e) => setFirstComment(e.target.value)} placeholder="Drop links or extra hashtags here…" />
-      </div>
+      {(showFirst || firstComment) ? (
+        <div className="cmp-field">
+          <div className="cmp-label-row">
+            <label>First comment <span className="muted">(posted right after)</span></label>
+            <button type="button" className="cmp-collapse" onClick={() => { setFirstComment(""); setShowFirst(false); }}>Remove</button>
+          </div>
+          <textarea rows={2} value={firstComment} onChange={(e) => setFirstComment(e.target.value)} placeholder="Drop links or extra hashtags here…" />
+        </div>
+      ) : (
+        <button type="button" className="cmp-add" onClick={() => setShowFirst(true)}>+ Add a first comment</button>
+      )}
 
       <div className="cmp-field">
         <label>Schedule for</label>
@@ -781,13 +811,16 @@ export default function ContentManager({ clientId, client, items, socials, tikto
               {it.status !== "published" && it.status !== "publishing" && (
                 <input type="checkbox" className="row-check" checked={checked.includes(it.id)} onChange={() => toggleCheck(it.id)} />
               )}
-              {it.media_urls?.[0] && (
-                it.cover_url
-                  ? <img className="content-thumb" src={it.cover_url} alt="" />
-                  : isVideoUrl(it.media_urls[0])
-                    ? <video className="content-thumb" src={it.media_urls[0]} muted playsInline preload="metadata" />
-                    : <img className="content-thumb" src={it.media_urls[0]} alt="" />
-              )}
+              {(() => {
+                const canEdit = it.status !== "published" && it.status !== "publishing";
+                const cls = "content-thumb" + (canEdit ? " clickable" : "");
+                const onClick = canEdit ? () => startEdit(it) : undefined;
+                const title = canEdit ? "Open this post" : undefined;
+                if (!it.media_urls?.[0]) return null;
+                if (it.cover_url) return <img className={cls} src={it.cover_url} alt="" onClick={onClick} title={title} />;
+                if (isVideoUrl(it.media_urls[0])) return <video className={cls} src={it.media_urls[0]} muted playsInline preload="metadata" onClick={onClick} title={title} />;
+                return <img className={cls} src={it.media_urls[0]} alt="" onClick={onClick} title={title} />;
+              })()}
               <div className="content-main">
                 <div className="content-top">
                   <span className={"cbadge " + it.status}>{STATUS_LABEL[it.status]}</span>
@@ -796,7 +829,8 @@ export default function ContentManager({ clientId, client, items, socials, tikto
                   {it.post_type && it.post_type !== "feed" && <span className="content-type">{it.post_type}</span>}
                   <span className="content-when">{it.scheduled_at ? new Date(it.scheduled_at).toLocaleString() : it.published_at ? "Published " + new Date(it.published_at).toLocaleDateString() : "no date"}</span>
                 </div>
-                <div className="content-cap">{it.caption?.slice(0, 140) || "(no caption)"}</div>
+                <div className={"content-cap" + (it.status !== "published" && it.status !== "publishing" ? " clickable" : "")}
+                  onClick={it.status !== "published" && it.status !== "publishing" ? () => startEdit(it) : undefined}>{it.caption?.slice(0, 140) || "(no caption)"}</div>
                 {it.note && <div className="content-note">📝 {it.note}</div>}
                 {it.error && (
                   <div className={"content-err " + (it.error_kind || "permanent")}>
