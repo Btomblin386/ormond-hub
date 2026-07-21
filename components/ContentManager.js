@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { fileToB64, uploadImage, imageSize, IG_FEED_MIN, IG_FEED_MAX, videoMeta, validateReel } from "../lib/media";
+import { fileToB64, uploadImage, uploadVideoSigned, imageSize, IG_FEED_MIN, IG_FEED_MAX, videoMeta, validateReel } from "../lib/media";
 import DropboxPicker from "./DropboxPicker";
 import ImageEditor from "./ImageEditor";
 
@@ -144,6 +144,9 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, dropb
   const [dbxOpen, setDbxOpen] = useState(false);
   const [dbxFolder, setDbxFolder] = useState(dropboxFolder || "");
   const [dragOver, setDragOver] = useState(false);
+  const [vDragOver, setVDragOver] = useState(false);
+  const [vUploading, setVUploading] = useState(false);
+  const [vProgress, setVProgress] = useState(null);
   const options = useMemo(() => buildOptions(socials, tiktok), [socials, tiktok]);
 
   const [selKeys, setSelKeys] = useState(() => {
@@ -178,6 +181,9 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, dropb
   const [videoWarn, setVideoWarn] = useState("");
   const sharedRef = useRef(null);
   const tabRef = useRef(null);
+  const [restored, setRestored] = useState(false);
+  const hydratedRef = useRef(false);
+  const draftKey = `hub:composer:${clientId}`;
 
   function flash(t) { setMsg(t); setTimeout(() => setMsg(""), 7000); }
   function toggleKey(k) {
@@ -229,6 +235,49 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, dropb
     return () => { cancel = true; };
   }, [usesVideo, videoUrl]);
 
+  // Draft persistence: a new post survives navigating away (Listen & Create,
+  // GA tab, etc.) and coming back. Keyed per client; never touches edit mode.
+  useEffect(() => {
+    if (editItem) { hydratedRef.current = true; return; }
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (d && typeof d === "object") {
+          if (typeof d.caption === "string") setCaption(d.caption);
+          if (d.variants && typeof d.variants === "object") setVariants((s) => ({ ...s, ...d.variants }));
+          if (d.baseType) setBaseType(d.baseType);
+          if (typeof d.link === "string") setLink(d.link);
+          if (Array.isArray(d.media)) setMedia(d.media);
+          if (typeof d.videoUrl === "string") setVideoUrl(d.videoUrl);
+          if (typeof d.firstComment === "string") setFirstComment(d.firstComment);
+          if (Array.isArray(d.selKeys)) { const k = d.selKeys.filter((x) => options.some((o) => o.key === x)); if (k.length) setSelKeys(k); }
+          if (typeof d.customize === "boolean") setCustomize(d.customize);
+          setRestored(true);
+        }
+      }
+    } catch {}
+    hydratedRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (editItem || !hydratedRef.current) return;
+    const hasContent = caption.trim() || media.length || videoUrl.trim() || firstComment.trim() ||
+      Object.values(variants).some((v) => v?.caption?.trim());
+    try {
+      if (hasContent) localStorage.setItem(draftKey, JSON.stringify({ caption, variants, baseType, link, media, videoUrl, firstComment, selKeys, customize }));
+      else localStorage.removeItem(draftKey);
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editItem, caption, variants, baseType, link, media, videoUrl, firstComment, selKeys, customize]);
+
+  function discardDraft() {
+    try { localStorage.removeItem(draftKey); } catch {}
+    setCaption(""); setVariants({ facebook: { caption: "", post_type: "feed" }, instagram: { caption: "", post_type: "feed" } });
+    setBaseType("feed"); setLink(""); setMedia([]); setVideoUrl(""); setFirstComment(""); setCustomize(false); setRestored(false);
+  }
+
   async function onFiles(e) {
     await uploadFiles([...e.target.files]);
   }
@@ -252,6 +301,19 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, dropb
       }
     } catch (err) { flash("Upload failed: " + (err.message || err)); } finally { setUploading(false); }
   }
+
+  async function onVideoFiles(files) {
+    const f = [...files].find((x) => x.type.startsWith("video/"));
+    if (!f) { flash("That file isn't a video. Reels and TikTok need an MP4/MOV."); return; }
+    setVUploading(true); setVProgress(0); setVideoWarn("");
+    try {
+      const d = await uploadVideoSigned({ file: f, onProgress: (pct) => setVProgress(pct) });
+      if (d.url) setVideoUrl(d.url);
+    } catch (err) {
+      flash("Video upload failed: " + (err.message || err));
+    } finally { setVUploading(false); setVProgress(null); }
+  }
+  function onVideoInput(e) { if (e.target.files?.length) onVideoFiles(e.target.files); }
 
   function validate() {
     if (!selKeys.length) return "Pick at least one account.";
@@ -320,7 +382,11 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, dropb
         if (d.error && !firstErr) firstErr = d.error;
       }
       if (firstErr) flash("Error: " + firstErr);
-      else { onDone(groups.length > 1 ? `${label} (${groups.length} accounts)` : label); router.refresh(); }
+      else {
+        if (!editItem) { try { localStorage.removeItem(draftKey); } catch {} }
+        onDone(groups.length > 1 ? `${label} (${groups.length} accounts)` : label);
+        router.refresh();
+      }
     } finally { setBusy(""); }
   }
 
@@ -328,6 +394,12 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, dropb
 
   return (
     <div className="composer">
+      {restored && !editItem && (
+        <div className="cmp-restored">
+          ↩ Restored your unsaved draft.
+          <button type="button" onClick={discardDraft}>Start fresh</button>
+        </div>
+      )}
       <div className="cmp-row">
         <div className="cmp-field" style={{ flex: 1, minWidth: 260 }}>
           <label>Post to</label>
@@ -376,10 +448,34 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, dropb
       )}
 
       {usesVideo ? (
-        <div className="cmp-field">
-          <label>Video URL {ttActive ? "(Reel / TikTok)" : "(Reel)"}</label>
-          <input type="url" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://…/video.mp4 (public MP4)" />
-          <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>Publishes from a public MP4 URL. Instagram: ≤ 90s, 9:16, 1080px wide. Direct upload coming soon.</div>
+        <div className={"cmp-field cmp-dropzone" + (vDragOver ? " over" : "")}
+          onDragOver={(e) => { e.preventDefault(); setVDragOver(true); }}
+          onDragLeave={() => setVDragOver(false)}
+          onDrop={(e) => { e.preventDefault(); setVDragOver(false); onVideoFiles(e.dataTransfer.files); }}>
+          <div className="cmp-label-row">
+            <label>Video {ttActive ? "(Reel / TikTok)" : "(Reel)"} <span className="muted">· drag &amp; drop, choose a file, or paste a URL</span></label>
+            <span className="muted" style={{ fontSize: 11 }}>≤ 90s, 9:16, 1080px wide</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <input type="file" accept="video/*" onChange={onVideoInput} disabled={vUploading} />
+          </div>
+          {vUploading && (
+            <div className="upl-prog">
+              <div className="upl-bar"><div className="upl-fill" style={{ width: (vProgress || 0) + "%" }} /></div>
+              <span className="upl-pct">{vProgress || 0}%</span>
+            </div>
+          )}
+          <div style={{ marginTop: 8 }}>
+            <input type="url" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="…or paste a public MP4 URL" style={{ width: "100%" }} />
+          </div>
+          {videoUrl && !vUploading && (
+            <div className="cmp-thumbs" style={{ marginTop: 8 }}>
+              <div className="cmp-thumb" style={{ width: 120, height: 120 }}>
+                <video src={videoUrl} muted playsInline preload="metadata" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8, background: "#000" }} />
+                <button type="button" onClick={() => setVideoUrl("")}>×</button>
+              </div>
+            </div>
+          )}
           {ttActive && <div className="cmp-warn" style={{ background: "#f5f3ff", borderColor: "#ddd6fe", color: "#5b21b6" }}>ℹ TikTok sends the video to the brand&apos;s TikTok <b>drafts</b> — someone finishes posting in the TikTok app (where they can add music &amp; effects). Direct-to-feed unlocks after TikTok approves the app.</div>}
           {videoWarn && <div className="cmp-warn">⚠ {videoWarn}</div>}
         </div>
