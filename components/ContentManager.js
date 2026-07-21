@@ -748,6 +748,13 @@ export default function ContentManager({ clientId, client, items, socials, tikto
       router.refresh();
     } finally { setBusy(""); }
   }
+  async function retryChannelAction(id, channel) {
+    setBusy(id + "rc" + channel);
+    try {
+      await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "retry_channel", id, channel }) });
+      router.refresh();
+    } finally { setBusy(""); }
+  }
   async function requestRevisions(id) {
     const note = window.prompt("What needs changing? (leave a note for the creator)");
     if (note === null) return;
@@ -838,6 +845,16 @@ export default function ContentManager({ clientId, client, items, socials, tikto
                     <span className="err-txt">{it.error}</span>
                   </div>
                 )}
+                {it.status === "failed" && it.channels?.length > 0 && (
+                  <div className="chan-retry">
+                    {it.channels.map((ch) => {
+                      const posted = { facebook: it.fb_post_id, instagram: it.ig_post_id, tiktok: it.tiktok_publish_id }[ch];
+                      return posted
+                        ? <span key={ch} className="chan-chip ok" title="Already published — won't re-post">{CHAN_LABEL[ch] || ch} ✓</span>
+                        : <button key={ch} className="chan-chip retry" disabled={busy === it.id + "rc" + ch} onClick={() => retryChannelAction(it.id, ch)}>↻ Retry {CHAN_LABEL[ch] || ch}</button>;
+                    })}
+                  </div>
+                )}
               </div>
               <div className="content-actions">
                 {it.status !== "published" && it.status !== "publishing" && <button onClick={() => startEdit(it)}>Edit</button>}
@@ -845,7 +862,6 @@ export default function ContentManager({ clientId, client, items, socials, tikto
                 {it.status === "needs_approval" && <button disabled={busy === it.id + "rev"} onClick={() => requestRevisions(it.id)}>Request revisions</button>}
                 {(it.status === "draft" || it.status === "needs_approval" || it.status === "needs_revisions") && <button className="cal-approve" disabled={busy === it.id + "approved"} onClick={() => itemAction(it.id, "approved")}>Approve</button>}
                 {["approved", "scheduled"].includes(it.status) && <button disabled={busy === it.id + "draft"} onClick={() => itemAction(it.id, "draft")}>Unschedule</button>}
-                {it.status === "failed" && <button disabled={busy === it.id + "approved"} onClick={() => itemAction(it.id, "approved")}>Retry</button>}
                 {it.status !== "published" && <button className="rule-del" disabled={busy === it.id + "del"} onClick={() => del(it.id)}>Delete</button>}
               </div>
             </div>

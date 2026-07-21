@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createContent, updateContent, setContentStatus, deleteContent, rescheduleContent, setContentRevisions, patchContent } from "../../../lib/db";
+import { createContent, updateContent, setContentStatus, deleteContent, rescheduleContent, setContentRevisions, patchContent, retryChannel } from "../../../lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +35,12 @@ export async function POST(req) {
       if (!STATUSES.includes(b.status)) return NextResponse.json({ error: "bad status" }, { status: 400 });
       await setContentStatus(b.id, b.status, b.approvedBy);
       if (b.publishNow) await kickPublisher();
+      return NextResponse.json({ ok: true });
+    }
+    if (op === "retry_channel") {
+      if (!["facebook", "instagram", "tiktok"].includes(b.channel)) return NextResponse.json({ error: "bad channel" }, { status: 400 });
+      await retryChannel(b.id, b.channel);
+      await kickPublisher();
       return NextResponse.json({ ok: true });
     }
     if (op === "reschedule") {

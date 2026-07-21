@@ -357,6 +357,13 @@ td a.rowlink { color: #4338ca; font-weight: 600; }
 .content-thumb.clickable:hover { transform: scale(1.05); box-shadow: 0 2px 10px rgba(0,0,0,.18); }
 .content-cap.clickable { cursor: pointer; }
 .content-cap.clickable:hover { text-decoration: underline; }
+/* Per-channel status + retry chips on a failed post */
+.chan-retry { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.chan-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 500; padding: 3px 9px; border-radius: 999px; border: 1px solid transparent; }
+.chan-chip.ok { background: #ecfdf5; color: #15803d; border-color: #bbf7d0; }
+.chan-chip.retry { background: #fff; color: #b45309; border-color: #fcd34d; cursor: pointer; transition: background .12s, border-color .12s; }
+.chan-chip.retry:hover:not(:disabled) { background: #fffbeb; border-color: #f59e0b; }
+.chan-chip.retry:disabled { opacity: .55; cursor: default; }
 .cmp-label-row { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 5px; }
 .cmp-label-row label { font-size: 12px; font-weight: 600; color: #374151; }
 .charcount { font-size: 11px; color: #9ca3af; }

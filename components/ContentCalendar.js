@@ -61,6 +61,7 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
   async function saveQuick() { setBusy("q"); try { await post("patch", { id: sel.id, caption: qCaption, note: qNote }); setSel(null); } finally { setBusy(""); } }
   async function reqRevisions() { setBusy("q"); try { await post("revisions", { id: sel.id, note: qNote }); setSel(null); } finally { setBusy(""); } }
   function openComposer() { setSel(null); router.push(`/accounts/${sel.client_id}/content?edit=${sel.id}`); }
+  async function retryChan(id, channel) { setBusy(id + channel); try { await post("retry_channel", { id, channel }); setSel(null); } finally { setBusy(""); } }
 
   const year = cursor.getFullYear(), month = cursor.getMonth();
   const startPad = new Date(year, month, 1).getDay();
@@ -370,6 +371,17 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
               </div>
             )}
             {sel.error && <div className="push-err">{sel.error}</div>}
+            {sel.status === "failed" && sel.channels?.length > 0 && (
+              <div className="chan-retry">
+                {sel.channels.map((ch) => {
+                  const posted = { facebook: sel.fb_post_id, instagram: sel.ig_post_id, tiktok: sel.tiktok_publish_id }[ch];
+                  const LBL = { facebook: "Facebook", instagram: "Instagram", tiktok: "TikTok" };
+                  return posted
+                    ? <span key={ch} className="chan-chip ok" title="Already published — won't re-post">{LBL[ch] || ch} ✓</span>
+                    : <button key={ch} className="chan-chip retry" disabled={busy === sel.id + ch} onClick={() => retryChan(sel.id, ch)}>↻ Retry {LBL[ch] || ch}</button>;
+                })}
+              </div>
+            )}
             <div className="cal-modal-actions">
               {(sel.status === "draft" || sel.status === "needs_revisions") && <button className="cal-reject" onClick={() => act(sel.id, "needs_approval")}>Submit for approval</button>}
               {["draft", "needs_approval", "needs_revisions"].includes(sel.status) && <button className="cal-approve" onClick={() => act(sel.id, "approved")}>Approve &amp; schedule</button>}
