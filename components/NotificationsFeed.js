@@ -3,6 +3,26 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+function isVideoUrl(u) {
+  if (!u) return false;
+  try { return /\.(mp4|mov|m4v|webm|avi|mkv)$/i.test(new URL(u).pathname); }
+  catch { return /\.(mp4|mov|m4v|webm|avi|mkv)(\?|$)/i.test(u); }
+}
+// Thumbnail for a content notification that links straight to the post in the
+// composer (edit mode) — so you can recognize and open it, not just approve blind.
+function NotifThumb({ item }) {
+  const u = item.cover_url || item.media_urls?.[0];
+  if (!u || !item.client_id) return null;
+  const href = `/accounts/${item.client_id}/content?edit=${item.id}`;
+  return (
+    <Link href={href} className="notif-thumb" title="Open this post">
+      {item.cover_url || !isVideoUrl(u)
+        ? <img src={item.cover_url || u} alt="" />
+        : <video src={u} muted playsInline preload="metadata" />}
+    </Link>
+  );
+}
+
 export default function NotificationsFeed({ data }) {
   const router = useRouter();
   const [busy, setBusy] = useState("");
@@ -77,10 +97,12 @@ export default function NotificationsFeed({ data }) {
       {overdue.map((t) => (
         <div key={"od" + t.id} className="notif overdue">
           <span className="notif-dot overdue" />
+          <NotifThumb item={t} />
           <div className="notif-body">
             <div className="notif-title">⚠ Missed schedule · <b>{t.client}</b> <span className="notif-when">was due {new Date(t.scheduled_at).toLocaleString()}</span></div>
             <div className="notif-sub">{t.status === "needs_approval" ? "Waiting on approval — " : "Still a draft — "}{t.caption?.slice(0, 80) || "(no caption)"}</div>
           </div>
+          <Link className="notif-open" href={`/accounts/${t.client_id}/content?edit=${t.id}`}>Open</Link>
           <button className="cal-approve" disabled={busy === t.id} onClick={() => approve(t.id)}>Approve now</button>
           <X k={t._key} />
         </div>
@@ -88,10 +110,12 @@ export default function NotificationsFeed({ data }) {
       {todos.map((t) => (
         <div key={t.id} className="notif todo">
           <span className="notif-dot approval" />
+          <NotifThumb item={t} />
           <div className="notif-body">
             <div className="notif-title">Content needs approval · <b>{t.client}</b></div>
             <div className="notif-sub">{t.caption?.slice(0, 90) || "(no caption)"}</div>
           </div>
+          <Link className="notif-open" href={`/accounts/${t.client_id}/content?edit=${t.id}`}>Open</Link>
           <button className="cal-approve" disabled={busy === t.id} onClick={() => approve(t.id)}>Approve</button>
         </div>
       ))}
