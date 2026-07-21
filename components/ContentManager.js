@@ -51,6 +51,11 @@ const STATUS_LABEL = {
 const LIMITS = { instagram: 2200, facebook: 63206, tiktok: 2200 };
 const CHAN_LABEL = { facebook: "Facebook", instagram: "Instagram", tiktok: "TikTok" };
 const TYPES = ["feed", "reel", "story"];
+function isVideoUrl(u) {
+  if (!u) return false;
+  try { return /\.(mp4|mov|m4v|webm|avi|mkv)$/i.test(new URL(u).pathname); }
+  catch { return /\.(mp4|mov|m4v|webm|avi|mkv)(\?|$)/i.test(u); }
+}
 
 /* ---------------- Social connection ---------------- */
 function SocialConnect({ clientId, client, socials }) {
@@ -170,8 +175,14 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
   }));
   const [baseType, setBaseType] = useState(editItem?.post_type || "feed");
   const [link, setLink] = useState(editItem?.link || "");
-  const [media, setMedia] = useState(editItem?.media_urls || []);
-  const [videoUrl, setVideoUrl] = useState("");
+  // A video post stores its video in media_urls[0]; split it back out for editing.
+  const editVideo = editItem && isVideoUrl(editItem.media_urls?.[0]) ? editItem.media_urls[0] : "";
+  const [media, setMedia] = useState(editVideo ? [] : (editItem?.media_urls || []));
+  const [videoUrl, setVideoUrl] = useState(editVideo);
+  const [coverUrl, setCoverUrl] = useState(editItem?.cover_url || "");
+  const [cUploading, setCUploading] = useState(false);
+  // Feed post carrying a video (FB feed video / IG reel) rather than images.
+  const [feedVideo, setFeedVideo] = useState(!!editVideo && (editItem?.post_type || "feed") === "feed");
   const [firstComment, setFirstComment] = useState(editItem?.first_comment || "");
   const [scheduledAt, setScheduledAt] = useState(seedDate || (editItem?.scheduled_at ? toLocalInput(editItem.scheduled_at) : nowPlus30()));
   const [activeTab, setActiveTab] = useState(selChans[0] || "facebook");
@@ -224,9 +235,12 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
     type: ch === "tiktok" ? "tiktok" : (customize ? (variants[ch]?.post_type || "feed") : baseType),
   })), [selChans, customize, variants, caption, baseType]);
 
-  const usesVideo = plan.some((p) => p.type === "reel" || p.ch === "tiktok");
-  const usesImage = plan.some((p) => p.type === "feed" || p.type === "story");
+  const feedActive = plan.some((p) => p.type === "feed" && p.ch !== "tiktok");
+  const usesVideo = plan.some((p) => p.type === "reel" || p.ch === "tiktok") || (feedVideo && feedActive);
+  const usesImage = plan.some((p) => p.type === "story") || (!feedVideo && feedActive);
   const ttActive = selChans.includes("tiktok");
+  const reelActive = plan.some((p) => p.type === "reel") || (feedVideo && feedActive);
+  const coverApplies = usesVideo && (selChans.includes("instagram") || selChans.includes("facebook")) && !(ttActive && selChans.length === 1);
 
   useEffect(() => {
     if (!usesVideo || !videoUrl.trim()) { setVideoWarn(""); return; }
@@ -250,6 +264,8 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
           if (typeof d.link === "string") setLink(d.link);
           if (Array.isArray(d.media)) setMedia(d.media);
           if (typeof d.videoUrl === "string") setVideoUrl(d.videoUrl);
+          if (typeof d.coverUrl === "string") setCoverUrl(d.coverUrl);
+          if (typeof d.feedVideo === "boolean") setFeedVideo(d.feedVideo);
           if (typeof d.firstComment === "string") setFirstComment(d.firstComment);
           if (Array.isArray(d.selKeys)) { const k = d.selKeys.filter((x) => options.some((o) => o.key === x)); if (k.length) setSelKeys(k); }
           if (typeof d.customize === "boolean") setCustomize(d.customize);
@@ -266,16 +282,16 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
     const hasContent = caption.trim() || media.length || videoUrl.trim() || firstComment.trim() ||
       Object.values(variants).some((v) => v?.caption?.trim());
     try {
-      if (hasContent) localStorage.setItem(draftKey, JSON.stringify({ caption, variants, baseType, link, media, videoUrl, firstComment, selKeys, customize }));
+      if (hasContent) localStorage.setItem(draftKey, JSON.stringify({ caption, variants, baseType, link, media, videoUrl, coverUrl, feedVideo, firstComment, selKeys, customize }));
       else localStorage.removeItem(draftKey);
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editItem, caption, variants, baseType, link, media, videoUrl, firstComment, selKeys, customize]);
+  }, [editItem, caption, variants, baseType, link, media, videoUrl, coverUrl, feedVideo, firstComment, selKeys, customize]);
 
   function discardDraft() {
     try { localStorage.removeItem(draftKey); } catch {}
     setCaption(""); setVariants({ facebook: { caption: "", post_type: "feed" }, instagram: { caption: "", post_type: "feed" } });
-    setBaseType("feed"); setLink(""); setMedia([]); setVideoUrl(""); setFirstComment(""); setCustomize(false); setRestored(false);
+    setBaseType("feed"); setLink(""); setMedia([]); setVideoUrl(""); setCoverUrl(""); setFeedVideo(false); setFirstComment(""); setCustomize(false); setRestored(false);
   }
 
   async function onFiles(e) {
@@ -315,21 +331,35 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
   }
   function onVideoInput(e) { if (e.target.files?.length) onVideoFiles(e.target.files); }
 
+  async function onCoverInput(e) {
+    const f = [...e.target.files].find((x) => x.type.startsWith("image/"));
+    if (!f) return;
+    setCUploading(true);
+    try {
+      const b64 = await fileToB64(f);
+      const d = await uploadImage({ image_base64: b64, filename: f.name });
+      if (d.url) setCoverUrl(d.url);
+    } catch (err) { flash("Cover upload failed: " + (err.message || err)); } finally { setCUploading(false); }
+  }
+
   function validate() {
     if (!selKeys.length) return "Pick at least one account.";
     if (usesVideo && usesImage) return "TikTok and Reels are video; Feed/Story are images — they can't share one post. Make separate posts.";
+    const chIsVideo = (p) => p.type === "reel" || p.ch === "tiktok" || (feedVideo && p.type === "feed");
     for (const p of plan) {
       if (p.caption.length > LIMITS[p.ch]) return `${CHAN_LABEL[p.ch]} caption is over the ${LIMITS[p.ch].toLocaleString()}-character limit.`;
       if (p.ch === "tiktok" && !videoUrl.trim()) return "TikTok posts need a video URL (TikTok is video only).";
       if (p.ch === "instagram") {
-        if (p.type === "reel" && !videoUrl.trim()) return "Instagram Reels need a video URL.";
-        if (p.type !== "reel" && media.length === 0) return "Instagram posts need at least one image.";
-        if (p.type === "story" && media.length > 1) return "A Story is a single image — remove the extras.";
-        if (media.length > 10) return "Instagram allows up to 10 images per post.";
+        if (chIsVideo(p)) { if (!videoUrl.trim()) return "Instagram video posts need a video."; }
+        else {
+          if (media.length === 0) return "Instagram posts need at least one image.";
+          if (p.type === "story" && media.length > 1) return "A Story is a single image — remove the extras.";
+          if (media.length > 10) return "Instagram allows up to 10 images per post.";
+        }
       }
       if (p.ch === "facebook") {
-        if (p.type === "story" && media.length === 0) return "A Facebook Story needs an image.";
-        if (p.type === "reel" && !videoUrl.trim()) return "Facebook Reels need a video URL.";
+        if (chIsVideo(p)) { if (!videoUrl.trim()) return "Facebook video posts need a video."; }
+        else if (p.type === "story" && media.length === 0) return "A Facebook Story needs an image.";
       }
     }
     return null;
@@ -345,7 +375,7 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
       : {};
     // Post Now = approved with an immediate (past) schedule so the publisher grabs it this run.
     const shared = {
-      clientId, caption, link: link || null, mediaUrls,
+      clientId, caption, link: link || null, mediaUrls, coverUrl: (usesVideo && coverUrl) ? coverUrl : null,
       postType: baseType, variants: payloadVariants, firstComment: firstComment || null,
       scheduledAt: publishNow ? new Date().toISOString() : (scheduledAt ? new Date(scheduledAt).toISOString() : null),
       publishNow,
@@ -447,6 +477,17 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
         </div>
       )}
 
+      {feedActive && (
+        <div className="cmp-field">
+          <label>Feed media</label>
+          <div className="type-picker">
+            <button type="button" className={"type-opt" + (!feedVideo ? " active" : "")} onClick={() => setFeedVideo(false)}>Images</button>
+            <button type="button" className={"type-opt" + (feedVideo ? " active" : "")} onClick={() => setFeedVideo(true)}>Video</button>
+          </div>
+          {feedVideo && <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>Posts as a Facebook feed video{selChans.includes("instagram") ? "; Instagram publishes it as a Reel (IG has no feed-video API)" : ""}.</div>}
+        </div>
+      )}
+
       {usesVideo ? (
         <div className={"cmp-field cmp-dropzone" + (vDragOver ? " over" : "")}
           onDragOver={(e) => { e.preventDefault(); setVDragOver(true); }}
@@ -469,11 +510,25 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
             <input type="url" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="…or paste a public MP4 URL" style={{ width: "100%" }} />
           </div>
           {videoUrl && !vUploading && (
-            <div className="cmp-thumbs" style={{ marginTop: 8 }}>
-              <div className="cmp-thumb" style={{ width: 120, height: 120 }}>
-                <video src={videoUrl} muted playsInline preload="metadata" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8, background: "#000" }} />
-                <button type="button" onClick={() => setVideoUrl("")}>×</button>
+            <div style={{ marginTop: 10, display: "flex", alignItems: "flex-start", gap: 10 }}>
+              <video src={videoUrl} controls playsInline preload="metadata" style={{ width: 180, maxHeight: 320, borderRadius: 10, background: "#000", border: "1px solid #e6e8eb" }} />
+              <button type="button" className="social-btn" onClick={() => setVideoUrl("")}>Remove video</button>
+            </div>
+          )}
+          {coverApplies && (
+            <div style={{ marginTop: 12 }}>
+              <label>Cover photo <span className="muted">(optional — the {reelActive ? "Reel" : "video"} thumbnail{selChans.includes("instagram") ? " on Instagram" : ""})</span></label>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
+                <input type="file" accept="image/*" onChange={onCoverInput} disabled={cUploading} />
+                {cUploading && <span className="muted" style={{ fontSize: 11 }}>Uploading…</span>}
+                {coverUrl && !cUploading && (
+                  <div className="cmp-thumb" style={{ width: 60, height: 60 }}>
+                    <img src={coverUrl} alt="cover" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 6 }} />
+                    <button type="button" onClick={() => setCoverUrl("")}>×</button>
+                  </div>
+                )}
               </div>
+              {selChans.includes("facebook") && !selChans.includes("instagram") && <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>Facebook picks the cover automatically — this applies on Instagram.</div>}
             </div>
           )}
           {ttActive && <div className="cmp-warn" style={{ background: "#f5f3ff", borderColor: "#ddd6fe", color: "#5b21b6" }}>ℹ TikTok sends the video to the brand&apos;s TikTok <b>drafts</b> — someone finishes posting in the TikTok app (where they can add music &amp; effects). Direct-to-feed unlocks after TikTok approves the app.</div>}
@@ -726,7 +781,13 @@ export default function ContentManager({ clientId, client, items, socials, tikto
               {it.status !== "published" && it.status !== "publishing" && (
                 <input type="checkbox" className="row-check" checked={checked.includes(it.id)} onChange={() => toggleCheck(it.id)} />
               )}
-              {Array.isArray(it.media_urls) && it.media_urls[0] && <img className="content-thumb" src={it.media_urls[0]} alt="" />}
+              {it.media_urls?.[0] && (
+                it.cover_url
+                  ? <img className="content-thumb" src={it.cover_url} alt="" />
+                  : isVideoUrl(it.media_urls[0])
+                    ? <video className="content-thumb" src={it.media_urls[0]} muted playsInline preload="metadata" />
+                    : <img className="content-thumb" src={it.media_urls[0]} alt="" />
+              )}
               <div className="content-main">
                 <div className="content-top">
                   <span className={"cbadge " + it.status}>{STATUS_LABEL[it.status]}</span>

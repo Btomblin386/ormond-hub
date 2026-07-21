@@ -6,6 +6,11 @@ const STATUS_LABEL = {
   draft: "Draft", needs_approval: "Needs approval", needs_revisions: "Needs revisions", approved: "Approved",
   scheduled: "Scheduled", publishing: "Publishing", published: "Published", failed: "Failed",
 };
+function isVideoUrl(u) {
+  if (!u) return false;
+  try { return /\.(mp4|mov|m4v|webm|avi|mkv)$/i.test(new URL(u).pathname); }
+  catch { return /\.(mp4|mov|m4v|webm|avi|mkv)(\?|$)/i.test(u); }
+}
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const pad = (n) => String(n).padStart(2, "0");
 function keyOf(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
@@ -334,8 +339,14 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
               <button className="cal-x" onClick={() => setSel(null)}>×</button>
             </div>
             <div className="cal-modal-when">{(sel.channels || []).join(" + ")} · {sel.scheduled_at ? new Date(sel.scheduled_at).toLocaleString() : "no date"}</div>
-            {Array.isArray(sel.media_urls) && sel.media_urls.length > 0 && (
-              <div className="cal-modal-media">{sel.media_urls.slice(0, 4).map((u, j) => <img key={j} src={u} alt="" />)}</div>
+            {sel.cover_url ? (
+              <div className="cal-modal-media"><img src={sel.cover_url} alt="" /></div>
+            ) : Array.isArray(sel.media_urls) && sel.media_urls.length > 0 && (
+              <div className="cal-modal-media">{sel.media_urls.slice(0, 4).map((u, j) => (
+                isVideoUrl(u)
+                  ? <video key={j} src={u} muted playsInline preload="metadata" controls />
+                  : <img key={j} src={u} alt="" />
+              ))}</div>
             )}
 
             {sel.status === "published" || sel.status === "publishing" ? (
