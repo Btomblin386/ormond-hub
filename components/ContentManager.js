@@ -136,7 +136,7 @@ function buildOptions(socials, tiktok) {
   return out;
 }
 
-function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, dropbox, dropboxFolder, brandLogo }) {
+function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCancel, dropbox, dropboxFolder, brandLogo }) {
   const router = useRouter();
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
@@ -525,7 +525,7 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, dropb
         </div>
       )}
 
-      {selChans.includes("facebook") && (
+      {plan.some((p) => p.ch === "facebook" && p.type === "feed") && (
         <div className="cmp-field">
           <label>Link <span className="muted">(Facebook feed only)</span></label>
           <input type="url" value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://…" />
@@ -545,6 +545,7 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, dropb
 
       {msg && <div className="push-err">{msg}</div>}
       <div className="cmp-actions">
+        {onCancel && <button className="cmp-btn ghost" onClick={onCancel} disabled={!!busy}>Cancel</button>}
         <button className="cmp-btn ghost" onClick={() => save("draft")} disabled={!!busy}>Save draft</button>
         <button className="cmp-btn outline" onClick={() => save("needs_approval")} disabled={!!busy}>Submit for approval</button>
         <button className="cmp-btn solid" onClick={() => save("approved")} disabled={!!busy}>{busy === "approved" ? "Scheduling…" : "Approve & schedule"}</button>
@@ -694,7 +695,7 @@ export default function ContentManager({ clientId, client, items, socials, tikto
       {open && (
         <>
           {editItem && <div className="cmp-editing">Editing an existing {STATUS_LABEL[editItem.status]?.toLowerCase()} post</div>}
-          <Composer key={editItem?.id || "new"} clientId={clientId} socials={socials} tiktok={tiktok} seedDate={seedDate} editItem={editItem} dropbox={dropbox} dropboxFolder={dropboxFolder} brandLogo={brandLogo} onDone={(m) => { flash(m); setOpen(false); setEditItem(null); }} />
+          <Composer key={editItem?.id || "new"} clientId={clientId} socials={socials} tiktok={tiktok} seedDate={seedDate} editItem={editItem} dropbox={dropbox} dropboxFolder={dropboxFolder} brandLogo={brandLogo} onDone={(m) => { flash(m); setOpen(false); setEditItem(null); }} onCancel={() => { setOpen(false); setEditItem(null); }} />
         </>
       )}
 
