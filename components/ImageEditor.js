@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from "react";
 
 // Canvas image editor for the composer: crop (drag to position + zoom) with a
 // live preview, ratio presets, filters, brand-logo watermark, and a fit mode
-// that pads with a color or blurred backdrop. Outputs 1080px-wide JPEG.
+// that pads with a color or blurred backdrop. Exports up to 1080px-wide JPEG
+// (Instagram's feed width) with high-quality resampling; never upscales.
 const RATIOS = [["orig", "Original"], ["1:1", "1:1"], ["4:5", "4:5"], ["1.91:1", "1.91:1"], ["9:16", "9:16"]];
 const RATIO_VAL = { "1:1": 1, "4:5": 4 / 5, "1.91:1": 1.91, "9:16": 9 / 16 };
 const FILTERS = [
@@ -62,6 +63,9 @@ export default function ImageEditor({ src, brandLogo, onApply, onClose }) {
     const W = outW, H = Math.round(outW / r);
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext("2d");
+    // High-quality resampling — matters most on the 1080px export downscale.
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
     const filt = FILTERS.find((f) => f[0] === filter)?.[2] || "";
 
     if (mode === "fit" && ratio !== "orig") {
@@ -123,8 +127,13 @@ export default function ImageEditor({ src, brandLogo, onApply, onClose }) {
     setBusy(true);
     try {
       const out = document.createElement("canvas");
-      render(out, 1080);
-      onApply(out.toDataURL("image/jpeg", 0.92));
+      // Export at 1080px wide (Instagram's feed display width), but never upscale
+      // a smaller source — manufacturing pixels only softens it. Fit mode pads to
+      // a full 1080 canvas (the padding is synthetic, so it's fine).
+      const img = imgRef.current;
+      const outW = mode === "fit" ? 1080 : Math.min(1080, img?.width || 1080);
+      render(out, outW);
+      onApply(out.toDataURL("image/jpeg", 0.95));
       onClose();
     } catch (e) { setErr(String(e.message || e)); } finally { setBusy(false); }
   }

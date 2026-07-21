@@ -319,10 +319,13 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
     try {
       for (const f of files) {
         const b64 = await fileToB64(f);
-        if (selChans.includes("instagram") && baseType === "feed") {
+        if (selChans.includes("instagram")) {
           try {
             const s = await imageSize(b64);
-            if (s.ratio < IG_FEED_MIN - 0.02 || s.ratio > IG_FEED_MAX + 0.02) setIgWarn("This image's shape is outside Instagram feed limits (portrait 4:5 to landscape 1.91:1). Click ✎ on the thumbnail to reframe it so it isn't rejected.");
+            if (baseType === "feed" && (s.ratio < IG_FEED_MIN - 0.02 || s.ratio > IG_FEED_MAX + 0.02))
+              setIgWarn("This image's shape is outside Instagram feed limits (portrait 4:5 to landscape 1.91:1). Click ✎ Edit in Studio to reframe it so it isn't rejected.");
+            else if (s.w < 1080)
+              setIgWarn(`This image is only ${s.w}px wide. Instagram displays feed images at 1080px, so it'll be upscaled and look soft — use a source at least 1080px wide for the sharpest result.`);
           } catch {}
         }
         setProgress((p) => ({ ...p, [f.name]: 0 }));
