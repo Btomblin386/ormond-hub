@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 
 const ROLE_LABEL = {
   agency: "Agency — full access",
+  manager: "Account Manager — content, approvals & calendar for all brands (no paid marketing or settings)",
   creator: "Creator — Content + Listen & Create",
   client: "Client — their brand's Content only",
 };
@@ -42,6 +43,15 @@ export default function TeamManager({ users, clients }) {
       router.refresh();
     } finally { setBusy(""); }
   }
+  async function changeRole(id, role) {
+    setBusy(id + "role");
+    try {
+      const r = await fetch("/api/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "set_role", id, role }) });
+      const d = await r.json();
+      if (d.error) flash("Error: " + d.error);
+      else { flash("Role updated. They'll pick up the new access next time they log in."); router.refresh(); }
+    } finally { setBusy(""); }
+  }
   const [resetFor, setResetFor] = useState(null);
   const [newPass, setNewPass] = useState("");
   async function resetPassword(id) {
@@ -74,6 +84,7 @@ export default function TeamManager({ users, clients }) {
             <label>Role</label>
             <select value={form.role} onChange={(e) => set("role", e.target.value)}>
               <option value="agency">Agency</option>
+              <option value="manager">Account Manager</option>
               <option value="creator">Creator</option>
               <option value="client">Client</option>
             </select>
@@ -107,6 +118,13 @@ export default function TeamManager({ users, clients }) {
               </div>
             </div>
             <div className="content-actions">
+              {u.role !== "client" && (
+                <select className="role-select" value={u.role} disabled={busy === u.id + "role"} onChange={(e) => changeRole(u.id, e.target.value)} title="Change role">
+                  <option value="agency">Agency</option>
+                  <option value="manager">Account Manager</option>
+                  <option value="creator">Creator</option>
+                </select>
+              )}
               <button className="social-btn" disabled={busy === u.id + "pw"} onClick={() => { setResetFor(resetFor === u.id ? null : u.id); setNewPass(""); }}>{resetFor === u.id ? "Cancel" : "Reset password"}</button>
               {u.active === false
                 ? <button className="cal-approve" disabled={busy === u.id} onClick={() => reactivate(u.id)}>Reactivate</button>

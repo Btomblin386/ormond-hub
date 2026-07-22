@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSession } from "../../../lib/session";
-import { listUsers, createUser, deactivateUser, reactivateUser, setUserPassword } from "../../../lib/db";
+import { listUsers, createUser, deactivateUser, reactivateUser, setUserPassword, setUserRole } from "../../../lib/db";
+
+const ROLES = ["agency", "manager", "creator", "client"];
 import { hashPassword } from "../../../lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -25,8 +27,14 @@ export async function POST(req) {
       await setUserPassword(b.id, hash, salt);
       return NextResponse.json({ ok: true });
     }
+    if (b.op === "set_role") {
+      if (!ROLES.includes(b.role)) return NextResponse.json({ error: "bad role" }, { status: 400 });
+      if (b.role === "client" && !b.clientId) return NextResponse.json({ error: "client users need a brand" }, { status: 400 });
+      await setUserRole(b.id, b.role, b.role === "client" ? b.clientId : null);
+      return NextResponse.json({ ok: true });
+    }
     if (!b.email || !b.password) return NextResponse.json({ error: "email and password required" }, { status: 400 });
-    if (!["agency", "creator", "client"].includes(b.role)) return NextResponse.json({ error: "bad role" }, { status: 400 });
+    if (!ROLES.includes(b.role)) return NextResponse.json({ error: "bad role" }, { status: 400 });
     if (b.role === "client" && !b.clientId) return NextResponse.json({ error: "client users need a brand" }, { status: 400 });
     const { hash, salt } = hashPassword(b.password);
     const [row] = await createUser({ email: b.email, name: b.name, role: b.role, clientId: b.clientId || null, hash, salt });

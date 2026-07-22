@@ -27,7 +27,9 @@ function Landing() {
 }
 
 export default async function Overview({ searchParams }) {
-  if (!getSession()) return <Landing />;
+  const session = getSession();
+  if (!session) return <Landing />;
+  const isAgency = session.role === "agency";
   const days = Number(searchParams?.days) || 30;
   const [totals, trendRows, accounts, notifications, calendar, lastFull, notes] = await Promise.all([
     agencyTotals(days),
@@ -62,33 +64,38 @@ export default async function Overview({ searchParams }) {
         <ContentCalendar items={calendar} notes={notes} showClient />
       </div>
 
-      <div className="cards">
-        <div className="card"><div className="label">Spend</div><div className="value">{money(totals.spend)}</div></div>
-        <div className="card"><div className="label">Revenue</div><div className="value">{money(totals.revenue)}</div></div>
-        <div className="card"><div className="label">Blended ROAS</div><div className={"value " + roasClass(blended)}>{blended.toFixed(1)}x</div></div>
-        <div className="card"><div className="label">Conversions</div><div className="value">{num(Math.round(totals.conversions))}</div></div>
-      </div>
+      {/* Paid-marketing financials — agency only (hidden for Account Managers). */}
+      {isAgency && (
+        <>
+          <div className="cards">
+            <div className="card"><div className="label">Spend</div><div className="value">{money(totals.spend)}</div></div>
+            <div className="card"><div className="label">Revenue</div><div className="value">{money(totals.revenue)}</div></div>
+            <div className="card"><div className="label">Blended ROAS</div><div className={"value " + roasClass(blended)}>{blended.toFixed(1)}x</div></div>
+            <div className="card"><div className="label">Conversions</div><div className="value">{num(Math.round(totals.conversions))}</div></div>
+          </div>
 
-      <div className="panel">
-        <h2>Account trends · last 7 full days</h2>
-        <p className="note">Spend (purple) &amp; revenue (green) per account vs. the prior 7 days{lastFull ? `, through ${lastFull} (last complete ingest day)` : ""}. Click a card for quick analytics.</p>
-        <AccountTrends accounts={accounts.filter((a) => a.has_ads)} trends={trendRows} endDate={lastFull} />
-      </div>
+          <div className="panel">
+            <h2>Account trends · last 7 full days</h2>
+            <p className="note">Spend (purple) &amp; revenue (green) per account vs. the prior 7 days{lastFull ? `, through ${lastFull} (last complete ingest day)` : ""}. Click a card for quick analytics.</p>
+            <AccountTrends accounts={accounts.filter((a) => a.has_ads)} trends={trendRows} endDate={lastFull} />
+          </div>
 
-      <div className="panel">
-        <h2>Accounts</h2>
-        <p className="note">Click an account to drill into its campaigns.</p>
-        <table>
-          <thead>
-            <tr><th>Account</th><th>Spend</th><th>Revenue</th><th>ROAS</th><th>Conv.</th><th>Clicks</th><th>Impr.</th></tr>
-          </thead>
-          <tbody>
-            {accounts.map((a) => (
-              <AccountRow key={a.id} account={a} days={days} />
-            ))}
-          </tbody>
-        </table>
-      </div>
+          <div className="panel">
+            <h2>Accounts</h2>
+            <p className="note">Click an account to drill into its campaigns.</p>
+            <table>
+              <thead>
+                <tr><th>Account</th><th>Spend</th><th>Revenue</th><th>ROAS</th><th>Conv.</th><th>Clicks</th><th>Impr.</th></tr>
+              </thead>
+              <tbody>
+                {accounts.map((a) => (
+                  <AccountRow key={a.id} account={a} days={days} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </Shell>
   );
 }

@@ -34,6 +34,7 @@ export default function Shell({ crumb, children, wide }) {
     fetch("/api/me").then((r) => r.json()).then((d) => setRole(d.role || "agency")).catch(() => {});
   }, []);
   const isAgency = role === "agency";
+  const isManager = role === "manager";
   const isClient = role === "client";
 
   const setDays = (d) => {
@@ -107,7 +108,7 @@ export default function Shell({ crumb, children, wide }) {
           </nav>
         ) : (
           <nav>
-            {isAgency && <Link href="/" className={"navlink" + (path === "/" ? " active" : "")}>Agency Overview</Link>}
+            {(isAgency || isManager) && <Link href="/" className={"navlink" + (path === "/" ? " active" : "")}>Agency Overview</Link>}
             <div className="navgroup">
               <button className={"navlink navgroup-head" + (path.startsWith("/accounts") ? " active" : "")} onClick={() => setAcctOpen((o) => !o)}>
                 <span>Accounts</span>

@@ -254,8 +254,10 @@ td a.rowlink { color: #4338ca; font-weight: 600; }
 /* role badges */
 .role-badge { font-size: 10px; text-transform: uppercase; font-weight: 700; letter-spacing: .03em; padding: 2px 8px; border-radius: 999px; }
 .role-badge.agency { background: #ede9fe; color: #6d28d9; }
+.role-badge.manager { background: #fef3c7; color: #b45309; }
 .role-badge.creator { background: #dbeafe; color: #1d4ed8; }
 .role-badge.client { background: #dcfce7; color: #15803d; }
+.role-select { border: 1px solid #d1d5db; background: #fff; font-size: 12px; padding: 5px 8px; border-radius: 8px; cursor: pointer; }
 .cbadge.approved { background: #e0e7ff; color: #4338ca; }
 .cbadge.scheduled { background: #dbeafe; color: #1d4ed8; }
 .cbadge.publishing { background: #ede9fe; color: #6d28d9; }
@@ -334,6 +336,14 @@ td a.rowlink { color: #4338ca; font-weight: 600; }
 .page-picker { display: flex; flex-direction: column; gap: 4px; width: 100%; margin-top: 6px; }
 .page-opt { border: 1px solid #d1d5db; background: #fff; text-align: left; font-size: 12.5px; padding: 7px 10px; border-radius: 8px; cursor: pointer; }
 .page-opt:hover { background: #f5f7ff; }
+.page-opt { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.page-opt.match { border-color: #6366f1; background: #eef2ff; }
+.page-tag { font-size: 10.5px; font-weight: 600; color: #4338ca; background: #e0e7ff; border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+.page-tag.other { color: #6b7280; background: #f1f2f4; }
+.page-help { margin-top: 8px; font-size: 12px; }
+.page-help > summary { cursor: pointer; color: #4338ca; font-weight: 500; list-style: revert; }
+.page-help-body { margin-top: 6px; color: #4b5563; line-height: 1.5; }
+.page-help-body ol { margin: 6px 0 0 18px; padding: 0; display: flex; flex-direction: column; gap: 3px; }
 .chan-row { display: flex; gap: 18px; margin-top: 2px; }
 
 /* ---------- Composer ---------- */

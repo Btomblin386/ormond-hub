@@ -82,7 +82,18 @@ function SocialConnect({ clientId, client, socials }) {
     try {
       const r = await fetch("/api/social", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "discover" }) });
       const d = await r.json();
-      if (d.error) setMsg("Error: " + d.error); else setPages(d.pages || []);
+      if (d.error) { setMsg("Error: " + d.error); return; }
+      const list = d.pages || [];
+      // discover auto-connects any Page whose id matches this brand's ad account —
+      // surface that instead of leaving the picker open on the brand's own Page.
+      const mine = list.find((p) => p.mapped_client === clientId);
+      if (mine) {
+        setMsg(`✓ Connected ${mine.name}${mine.ig_username ? " · @" + mine.ig_username : ""}.`);
+        setPages(null);
+        router.refresh();
+      } else {
+        setPages(list);
+      }
     } finally { setBusy(false); }
   }
   async function connect(page_id) {
@@ -93,15 +104,42 @@ function SocialConnect({ clientId, client, socials }) {
       if (d.error) setMsg("Error: " + d.error); else { router.refresh(); setPages(null); }
     } finally { setBusy(false); }
   }
+  const sortedPages = pages ? [...pages].sort((a, b) => (b.mapped_client === clientId) - (a.mapped_client === clientId)) : [];
+  const pageHelp = (
+    <details className="page-help">
+      <summary>Don&apos;t see {client}&apos;s Page?</summary>
+      <div className="page-help-body">
+        The Page has to be shared with the app&apos;s Meta <b>system user</b> in Business Settings:
+        <ol>
+          <li>Open <b>business.facebook.com → Business Settings</b>.</li>
+          <li><b>Accounts → Pages</b>: make sure {client}&apos;s Page is added to your Business.</li>
+          <li><b>Users → System Users</b>: pick the app&apos;s system user → <b>Add Assets → Pages</b> → select the Page → turn on <b>Manage Page</b>.</li>
+          <li>Confirm the Instagram account is linked to that Page (needed for IG publishing).</li>
+          <li>Come back and click <b>Connect a Page</b> again.</li>
+        </ol>
+      </div>
+    </details>
+  );
   const picker = pages && (
     <div className="page-picker">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span className="muted" style={{ fontSize: 11 }}>Pick a Page to connect</span>
+        <span className="muted" style={{ fontSize: 11 }}>Pick a Page to connect to {client}</span>
         <button className="cal-x" style={{ fontSize: 16 }} onClick={() => setPages(null)} title="Close">×</button>
       </div>
       {!pages.length
-        ? <div className="muted" style={{ fontSize: 12 }}>No Pages available on the token. Make sure the Page is shared to your business.</div>
-        : pages.map((p) => <button key={p.id} className="page-opt" disabled={busy} onClick={() => connect(p.id)}>{p.name}{p.ig_username ? ` · @${p.ig_username}` : ""}</button>)}
+        ? <div className="muted" style={{ fontSize: 12 }}>No Pages available on the token — the Page must be shared with the app&apos;s Meta system user (see below).</div>
+        : sortedPages.map((p) => {
+            const isMine = p.mapped_client === clientId;
+            const other = p.mapped_client && p.mapped_client !== clientId;
+            return (
+              <button key={p.id} className={"page-opt" + (isMine ? " match" : "")} disabled={busy} onClick={() => connect(p.id)}>
+                <span>{p.name}{p.ig_username ? ` · @${p.ig_username}` : ""}</span>
+                {isMine && <span className="page-tag">matches this brand</span>}
+                {other && <span className="page-tag other">another brand</span>}
+              </button>
+            );
+          })}
+      {pageHelp}
     </div>
   );
 
@@ -410,7 +448,7 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
       if (!g.channels.includes(ch)) g.channels.push(ch);
     }
     const effStatus = publishNow ? "approved" : status;
-    const label = publishNow ? "Publishing now…" : status === "draft" ? "Saved as draft." : status === "needs_approval" ? "Submitted for approval." : "Approved & scheduled.";
+    const label = publishNow ? "Publishing now…" : (editItem && status === editItem.status) ? "Changes saved." : status === "draft" ? "Saved as draft." : status === "needs_approval" ? "Submitted for approval." : "Approved & scheduled.";
     try {
       let firstErr = null;
       for (let i = 0; i < groups.length; i++) {
@@ -634,6 +672,11 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
       {msg && <div className="push-err">{msg}</div>}
       <div className="cmp-actions">
         {onCancel && <button className="cmp-btn ghost" onClick={onCancel} disabled={!!busy}>Cancel</button>}
+        {editItem && editItem.status !== "draft" && (
+          <button className="cmp-btn solid" onClick={() => save(editItem.status)} disabled={!!busy} title="Save your edits (time, caption, media) without changing the approval status">
+            {busy === editItem.status ? "Saving…" : "Save changes"}
+          </button>
+        )}
         <button className="cmp-btn ghost" onClick={() => save("draft")} disabled={!!busy}>Save draft</button>
         <button className="cmp-btn outline" onClick={() => save("needs_approval")} disabled={!!busy}>Submit for approval</button>
         <button className="cmp-btn solid" onClick={() => save("approved")} disabled={!!busy}>{busy === "approved" ? "Scheduling…" : "Approve & schedule"}</button>

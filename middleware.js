@@ -91,6 +91,33 @@ export async function middleware(req) {
     return NextResponse.next();
   }
 
+  // ---- ACCOUNT MANAGER: everything a creator can do, PLUS the cross-account
+  // agency overview (approvals, calendar, retries). Still no paid marketing,
+  // agency/account settings, team, reconciliation, onboarding, or billing. ----
+  if (role === "manager") {
+    if (PAID_APIS.some((a) => pathname.startsWith(a))) {
+      return new NextResponse(JSON.stringify({ error: "Not permitted for your role" }), { status: 403, headers: { "Content-Type": "application/json" } });
+    }
+    const blockedPage =
+      pathname.startsWith("/reconciliation") ||
+      pathname.startsWith("/onboard") ||
+      pathname.startsWith("/settings") ||
+      pathname.startsWith("/team") ||
+      pathname === "/assistant" ||
+      /^\/accounts\/[^/]+$/.test(pathname) ||        // paid-marketing account root
+      /^\/accounts\/[^/]+\/google/.test(pathname) ||    // google analytics/ads tab
+      /^\/accounts\/[^/]+\/settings/.test(pathname) ||  // account settings
+      /^\/accounts\/[^/]+\/assistant/.test(pathname);   // account assistant
+    if (blockedPage) {
+      const url = req.nextUrl.clone();
+      const m = pathname.match(/^\/accounts\/([^/]+)$/);
+      url.pathname = m ? `/accounts/${m[1]}/content` : "/accounts";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+    return NextResponse.next();
+  }
+
   // ---- CREATOR: Content + Listen & Create; no paid marketing ----
   if (role === "creator") {
     if (PAID_APIS.some((a) => pathname.startsWith(a))) {
