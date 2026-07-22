@@ -246,6 +246,7 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
   const [restored, setRestored] = useState(false);
   const [showLink, setShowLink] = useState(false);
   const [showFirst, setShowFirst] = useState(false);
+  const [previewCh, setPreviewCh] = useState("instagram");
   const hydratedRef = useRef(false);
   const draftKey = `hub:composer:${clientId}`;
 
@@ -478,8 +479,14 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
 
   const igActive = selChans.includes("instagram");
 
+  // Live preview: which channel's card to show + its effective caption/media.
+  const pvCh = selChans.includes(previewCh) ? previewCh : (selChans[0] || null);
+  const previewCaption = customize ? (variants[pvCh]?.caption || "") : caption;
+  const previewType = pvCh === "tiktok" ? "tiktok" : (customize ? (variants[pvCh]?.post_type || "feed") : baseType);
+
   return (
     <div className="composer">
+      <div className="cmp-main">
       {restored && !editItem && (
         <div className="cmp-restored">
           ↩ Restored your unsaved draft.
@@ -681,6 +688,68 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
         <button className="cmp-btn outline" onClick={() => save("needs_approval")} disabled={!!busy}>Submit for approval</button>
         <button className="cmp-btn solid" onClick={() => save("approved")} disabled={!!busy}>{busy === "approved" ? "Scheduling…" : "Approve & schedule"}</button>
         <button className="cmp-btn now" onClick={() => save("approved", true)} disabled={!!busy} title="Publish immediately to the live account(s)">{busy === "now" ? "Publishing…" : "⚡ Post now"}</button>
+      </div>
+      </div>
+
+      <aside className="cmp-preview">
+        <div className="pv-bar">
+          <span className="pv-title">Preview</span>
+          {selChans.length > 1 && (
+            <div className="pv-tabs">
+              {selChans.map((ch) => <button key={ch} type="button" className={"pv-tab" + (pvCh === ch ? " on" : "")} onClick={() => setPreviewCh(ch)}>{CHAN_LABEL[ch]}</button>)}
+            </div>
+          )}
+        </div>
+        {pvCh
+          ? <ComposerPreview channel={pvCh} options={options} brandLogo={brandLogo} caption={previewCaption} postType={previewType} usesVideo={usesVideo} videoUrl={videoUrl} coverUrl={coverUrl} media={media} />
+          : <div className="muted" style={{ fontSize: 12, padding: 12 }}>Pick an account to see a preview.</div>}
+        <div className="pv-hint">Line breaks &amp; paragraphs show exactly as they&apos;ll post. Instagram &amp; Facebook collapse long captions after ~125 characters with a “more” link.</div>
+      </aside>
+    </div>
+  );
+}
+
+/* ---------------- Live post preview ---------------- */
+function ComposerPreview({ channel, options, brandLogo, caption, postType, usesVideo, videoUrl, coverUrl, media }) {
+  const opt = options.find((o) => o.ch === channel);
+  const isIG = channel === "instagram";
+  const isTT = channel === "tiktok";
+  const rawHandle = opt?.label || (isIG ? "instagram" : isTT ? "tiktok" : "Facebook Page");
+  const handle = rawHandle.replace(/^@/, "");
+  const showVideo = usesVideo && !!videoUrl;
+  const imgs = Array.isArray(media) ? media : [];
+  const TRUNC = 125;
+  const text = caption || "";
+  const feedTrunc = !isTT && [...text].length > TRUNC ? [...text].slice(0, TRUNC).join("") : null;
+
+  return (
+    <div className={"pv-card " + channel}>
+      <div className="pv-head">
+        <div className="pv-avatar">{brandLogo ? <img src={brandLogo} alt="" /> : <span>{handle.slice(0, 1).toUpperCase()}</span>}</div>
+        <div className="pv-name">{isIG || isTT ? handle : rawHandle}</div>
+        <span className="pv-more">⋯</span>
+      </div>
+      <div className={"pv-media" + (showVideo || postType === "reel" || postType === "story" ? " tall" : "")}>
+        {showVideo
+          ? <video src={videoUrl} muted playsInline preload="metadata" poster={coverUrl || undefined} />
+          : imgs.length
+            ? <img src={imgs[0]} alt="" />
+            : <div className="pv-media-empty">Media preview</div>}
+        {!showVideo && imgs.length > 1 && <span className="pv-count">1 / {imgs.length}</span>}
+      </div>
+      <div className="pv-body">
+        <div className="pv-caption">
+          {(isIG || isTT) && text && <b className="pv-user">{handle}</b>}
+          {text
+            ? <span className="pv-cap-text">{text}</span>
+            : <span className="pv-cap-text muted">Your caption will render here — with the exact line breaks and spacing it&apos;ll post with.</span>}
+        </div>
+        {feedTrunc && (
+          <div className="pv-feednote">
+            In the feed it collapses to:<br />
+            <span className="pv-feedtext">{feedTrunc}…</span> <b>more</b>
+          </div>
+        )}
       </div>
     </div>
   );
