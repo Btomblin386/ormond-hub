@@ -424,8 +424,18 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
 
   async function save(status, publishNow = false) {
     const err = validate(); if (err) { flash(err); return; }
-    if (publishNow && !window.confirm("Publish now to the live account(s)? This posts immediately.")) return;
-    setBusy(publishNow ? "now" : status);
+    let postNow = publishNow;
+    // Approving/scheduling a post whose time already passed would publish it within
+    // minutes with no heads-up — prompt to post now or go back and pick a new time.
+    if (!postNow && (status === "approved" || status === "scheduled") && scheduledAt && new Date(scheduledAt).getTime() < Date.now()) {
+      const when = new Date(scheduledAt).toLocaleString();
+      const ok = window.confirm(`The scheduled time (${when}) has already passed.\n\nOK — publish it now.\nCancel — go back and pick a new time.`);
+      if (!ok) { flash("Pick a future time above, then approve again."); return; }
+      postNow = true;
+    } else if (postNow && !window.confirm("Publish now to the live account(s)? This posts immediately.")) {
+      return;
+    }
+    setBusy(postNow ? "now" : status);
     const mediaUrls = usesVideo ? [videoUrl.trim()] : media;
     const payloadVariants = customize
       ? Object.fromEntries(selChans.map((ch) => [ch, { caption: variants[ch]?.caption || "", post_type: variants[ch]?.post_type || "feed" }]))
@@ -434,8 +444,8 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
     const shared = {
       clientId, caption, link: link || null, mediaUrls, coverUrl: (usesVideo && coverUrl) ? coverUrl : null,
       postType: baseType, variants: payloadVariants, firstComment: firstComment || null,
-      scheduledAt: publishNow ? new Date().toISOString() : (scheduledAt ? new Date(scheduledAt).toISOString() : null),
-      publishNow,
+      scheduledAt: postNow ? new Date().toISOString() : (scheduledAt ? new Date(scheduledAt).toISOString() : null),
+      publishNow: postNow,
     };
     // one content item per selected identity; TikTok has no Meta social_accounts
     // row, so its group saves with socialAccountId null (publisher looks it up by
@@ -448,8 +458,8 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
       if (!g) { g = { socialAccountId: groupSid, channels: [] }; groups.push(g); }
       if (!g.channels.includes(ch)) g.channels.push(ch);
     }
-    const effStatus = publishNow ? "approved" : status;
-    const label = publishNow ? "Publishing now…" : (editItem && status === editItem.status) ? "Changes saved." : status === "draft" ? "Saved as draft." : status === "needs_approval" ? "Submitted for approval." : "Approved & scheduled.";
+    const effStatus = postNow ? "approved" : status;
+    const label = postNow ? "Publishing now…" : (editItem && status === editItem.status) ? "Changes saved." : status === "draft" ? "Saved as draft." : status === "needs_approval" ? "Submitted for approval." : "Approved & scheduled.";
     try {
       let firstErr = null;
       for (let i = 0; i < groups.length; i++) {
@@ -459,7 +469,7 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
           const r1 = await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "update", id: editItem.id, ...shared, channels: g.channels, socialAccountId: g.socialAccountId }) });
           d = await r1.json();
           if (!d.error) {
-            const r2 = await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "status", id: editItem.id, status: effStatus, approvedBy: "agency", publishNow }) });
+            const r2 = await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "status", id: editItem.id, status: effStatus, approvedBy: "agency", publishNow: postNow }) });
             d = await r2.json();
           }
         } else {
@@ -674,6 +684,9 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
         <label>Schedule for</label>
         <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
         <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>Leave blank to publish as soon as it&apos;s approved.</div>
+        {scheduledAt && new Date(scheduledAt).getTime() < Date.now() && (
+          <div className="cmp-warn" style={{ marginTop: 6 }}>⚠ This time has already passed — approving will publish within a few minutes. Pick a future time, or use ⚡ Post now.</div>
+        )}
       </div>
 
       {msg && <div className="push-err">{msg}</div>}
@@ -857,6 +870,13 @@ export default function ContentManager({ clientId, client, items, socials, tikto
   }, [editId]);
 
   async function itemAction(id, status) {
+    if (status === "approved") {
+      const it = items.find((x) => x.id === id);
+      if (it?.scheduled_at && new Date(it.scheduled_at).getTime() < Date.now()) {
+        const ok = window.confirm(`This post's scheduled time (${new Date(it.scheduled_at).toLocaleString()}) has already passed — approving publishes it within a few minutes.\n\nOK — approve & publish shortly.\nCancel — open it to pick a new time.`);
+        if (!ok) { startEdit(it); return; }
+      }
+    }
     setBusy(id + status);
     try {
       await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "status", id, status, approvedBy: "agency" }) });

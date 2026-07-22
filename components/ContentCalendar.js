@@ -83,6 +83,10 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
   for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d));
 
   async function act(id, status) {
+    if (status === "approved" && sel?.scheduled_at && new Date(sel.scheduled_at).getTime() < Date.now()) {
+      const ok = window.confirm(`The scheduled time (${new Date(sel.scheduled_at).toLocaleString()}) has already passed — approving publishes it within a few minutes.\n\nOK — approve & publish shortly.\nCancel — go back and use “Update time” first.`);
+      if (!ok) return;
+    }
     setBusy(id + status);
     try {
       await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "status", id, status, approvedBy: "agency" }) });
