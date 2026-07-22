@@ -17,7 +17,15 @@ function keyOf(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.
 
 function fmtTime(iso) {
   if (!iso) return "";
-  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  // en-US 12-hour so every viewer sees AM/PM regardless of OS locale.
+  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+}
+// Full date + time, 12-hour, identical for all viewers (month name avoids DD/MM vs MM/DD).
+function fmtWhen(v) {
+  if (!v) return "";
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
 }
 // ISO -> value for <input type="datetime-local"> in the viewer's local zone.
 function toLocalInput(iso) {
@@ -84,7 +92,7 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
 
   async function act(id, status) {
     if (status === "approved" && sel?.scheduled_at && new Date(sel.scheduled_at).getTime() < Date.now()) {
-      const ok = window.confirm(`The scheduled time (${new Date(sel.scheduled_at).toLocaleString()}) has already passed — approving publishes it within a few minutes.\n\nOK — approve & publish shortly.\nCancel — go back and use “Update time” first.`);
+      const ok = window.confirm(`The scheduled time (${fmtWhen(sel.scheduled_at)}) has already passed — approving publishes it within a few minutes.\n\nOK — approve & publish shortly.\nCancel — go back and use “Update time” first.`);
       if (!ok) return;
     }
     setBusy(id + status);
@@ -343,7 +351,7 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
               <span className="cal-modal-client">{sel.client}</span>
               <button className="cal-x" onClick={() => setSel(null)}>×</button>
             </div>
-            <div className="cal-modal-when">{(sel.channels || []).join(" + ")} · {sel.scheduled_at ? new Date(sel.scheduled_at).toLocaleString() : "no date"}</div>
+            <div className="cal-modal-when">{(sel.channels || []).join(" + ")} · {sel.scheduled_at ? fmtWhen(sel.scheduled_at) : "no date"}</div>
             {sel.cover_url ? (
               <div className="cal-modal-media"><img src={sel.cover_url} alt="" /></div>
             ) : Array.isArray(sel.media_urls) && sel.media_urls.length > 0 && (
@@ -363,6 +371,7 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
                   <input type="datetime-local" value={qWhen} onChange={(e) => setQWhen(e.target.value)} />
                   <button className="social-btn" disabled={busy === "q" || qWhen === (sel.scheduled_at ? toLocalInput(sel.scheduled_at) : "")} onClick={saveQuickTime}>Update time</button>
                 </div>
+                {qWhen && <div className="muted" style={{ fontSize: 11, marginBottom: 6 }}>📅 {fmtWhen(qWhen)}</div>}
                 <label>Caption</label>
                 <textarea rows={3} value={qCaption} onChange={(e) => setQCaption(e.target.value)} />
                 <label>Note {sel.status === "needs_revisions" ? "· revisions requested" : "(for the team)"}</label>

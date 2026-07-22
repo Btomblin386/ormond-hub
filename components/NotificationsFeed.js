@@ -8,6 +8,13 @@ function isVideoUrl(u) {
   try { return /\.(mp4|mov|m4v|webm|avi|mkv)$/i.test(new URL(u).pathname); }
   catch { return /\.(mp4|mov|m4v|webm|avi|mkv)(\?|$)/i.test(u); }
 }
+// 12-hour, en-US so times read the same for every viewer regardless of OS locale.
+function fmtWhen(v) {
+  if (!v) return "";
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
+}
 // Thumbnail for a content notification that links straight to the post in the
 // composer (edit mode) — so you can recognize and open it, not just approve blind.
 function NotifThumb({ item }) {
@@ -78,7 +85,7 @@ export default function NotificationsFeed({ data }) {
         <div key={"rm" + t.id} className="notif todo">
           <span className="notif-dot approval" />
           <div className="notif-body">
-            <div className="notif-title">⏰ Reminder · <b>{t.client}</b> <span className="notif-when">{new Date(t.due_at).toLocaleString()}</span></div>
+            <div className="notif-title">⏰ Reminder · <b>{t.client}</b> <span className="notif-when">{fmtWhen(t.due_at)}</span></div>
             <div className="notif-sub">{t.title}</div>
           </div>
           <button className="rule-ack" disabled={busy === t.id} onClick={() => taskOp(t.id, "dismiss")}>Done</button>
@@ -99,7 +106,7 @@ export default function NotificationsFeed({ data }) {
           <span className="notif-dot overdue" />
           <NotifThumb item={t} />
           <div className="notif-body">
-            <div className="notif-title">⚠ Missed schedule · <b>{t.client}</b> <span className="notif-when">was due {new Date(t.scheduled_at).toLocaleString()}</span></div>
+            <div className="notif-title">⚠ Missed schedule · <b>{t.client}</b> <span className="notif-when">was due {fmtWhen(t.scheduled_at)}</span></div>
             <div className="notif-sub">{t.status === "needs_approval" ? "Waiting on approval — " : "Still a draft — "}{t.caption?.slice(0, 80) || "(no caption)"}</div>
           </div>
           <Link className="notif-open" href={`/accounts/${t.client_id}/content?edit=${t.id}`}>Open</Link>
@@ -123,7 +130,7 @@ export default function NotificationsFeed({ data }) {
         <div key={"st" + t.id} className="notif fail">
           <span className="notif-dot fail" />
           <div className="notif-body">
-            <div className="notif-title">Post stuck publishing · <b>{t.client}</b> <span className="notif-when">since {new Date(t.created_at).toLocaleString()}</span></div>
+            <div className="notif-title">Post stuck publishing · <b>{t.client}</b> <span className="notif-when">since {fmtWhen(t.created_at)}</span></div>
             <div className="notif-sub">Publisher hasn&apos;t completed this post — check the function logs if it persists. {t.caption?.slice(0, 70) || ""}</div>
           </div>
           <X k={t._key} />

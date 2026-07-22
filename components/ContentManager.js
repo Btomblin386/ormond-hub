@@ -56,6 +56,15 @@ function isVideoUrl(u) {
   try { return /\.(mp4|mov|m4v|webm|avi|mkv)$/i.test(new URL(u).pathname); }
   catch { return /\.(mp4|mov|m4v|webm|avi|mkv)(\?|$)/i.test(u); }
 }
+// Always render times in 12-hour AM/PM (the native datetime input follows the
+// viewer's OS locale, which can be 24-hour — this keeps our own text consistent).
+function fmt12(v) {
+  if (!v) return "";
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return "";
+  // en-US + month name so it's identical for every viewer (no DD/MM vs MM/DD, no 24h).
+  return d.toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
+}
 
 // Styled file picker: the native <input type=file> button can't be restyled, so
 // we hide it behind a label that matches the app's other buttons. Resets its
@@ -683,7 +692,9 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
       <div className="cmp-field">
         <label>Schedule for</label>
         <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
-        <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>Leave blank to publish as soon as it&apos;s approved.</div>
+        {scheduledAt
+          ? <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>📅 {fmt12(scheduledAt)}</div>
+          : <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>Leave blank to publish as soon as it&apos;s approved.</div>}
         {scheduledAt && new Date(scheduledAt).getTime() < Date.now() && (
           <div className="cmp-warn" style={{ marginTop: 6 }}>⚠ This time has already passed — approving will publish within a few minutes. Pick a future time, or use ⚡ Post now.</div>
         )}
@@ -969,7 +980,7 @@ export default function ContentManager({ clientId, client, items, socials, tikto
                   {multiIdent && it.identity_name && <span className="content-ident">{it.identity_name}</span>}
                   <span className="content-chan">{(it.channels || []).join(" + ")}</span>
                   {it.post_type && it.post_type !== "feed" && <span className="content-type">{it.post_type}</span>}
-                  <span className="content-when">{it.scheduled_at ? new Date(it.scheduled_at).toLocaleString() : it.published_at ? "Published " + new Date(it.published_at).toLocaleDateString() : "no date"}</span>
+                  <span className="content-when">{it.scheduled_at ? fmt12(it.scheduled_at) : it.published_at ? "Published " + fmt12(it.published_at) : "no date"}</span>
                 </div>
                 <div className={"content-cap" + (it.status !== "published" && it.status !== "publishing" ? " clickable" : "")}
                   onClick={it.status !== "published" && it.status !== "publishing" ? () => startEdit(it) : undefined}>{it.caption?.slice(0, 140) || "(no caption)"}</div>
