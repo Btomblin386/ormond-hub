@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 const PUBLIC = ["/login", "/agency-master-login", "/api/login", "/api/media", "/privacy", "/terms", "/data-deletion"];
 
 // Paid-marketing APIs that creators/clients may not call
-const PAID_APIS = ["/api/manage", "/api/create", "/api/rules", "/api/account-settings", "/api/campaign-plan", "/api/audiences", "/api/pin", "/api/users", "/api/analytics", "/api/analytics-summary", "/api/oauth", "/api/tasks", "/api/leads"];
+const PAID_APIS = ["/api/manage", "/api/create", "/api/rules", "/api/account-settings", "/api/campaign-plan", "/api/audiences", "/api/pin", "/api/users", "/api/analytics", "/api/analytics-summary", "/api/oauth", "/api/tasks", "/api/leads", "/api/inbox"];
 
 function b64urlFromBytes(bytes) {
   let bin = "";
@@ -108,6 +108,7 @@ export async function middleware(req) {
       /^\/accounts\/[^/]+\/google/.test(pathname) ||    // google analytics/ads tab
       /^\/accounts\/[^/]+\/settings/.test(pathname) ||  // account settings
       /^\/accounts\/[^/]+\/leads/.test(pathname) ||    // meta lead ads (agency only)
+      /^\/accounts\/[^/]+\/inbox/.test(pathname) ||    // messaging inbox (agency only)
       /^\/accounts\/[^/]+\/assistant/.test(pathname);   // account assistant
     if (blockedPage) {
       const url = req.nextUrl.clone();
@@ -135,6 +136,7 @@ export async function middleware(req) {
       /^\/accounts\/[^/]+\/google/.test(pathname) ||    // google analytics/ads tab
       /^\/accounts\/[^/]+\/settings/.test(pathname) ||  // account settings
       /^\/accounts\/[^/]+\/leads/.test(pathname) ||    // meta lead ads (agency only)
+      /^\/accounts\/[^/]+\/inbox/.test(pathname) ||    // messaging inbox (agency only)
       /^\/accounts\/[^/]+\/assistant/.test(pathname);   // account assistant
     if (blockedPage) {
       const url = req.nextUrl.clone();
