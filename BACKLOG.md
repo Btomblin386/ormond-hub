@@ -16,6 +16,30 @@ One task at a time.
 ## Next up
 - **Push drafts to Meta (paused)** — take a Campaign Studio draft and create it in Meta as PAUSED for review/approval, then one-click activate. Uses Meta ads_management (already granted). Needs creative handling (image/video upload or reference).
 
+## Backlog — added 2026-07
+- **Instagram product tagging (Shopping)** — tag catalog products in feed
+  posts/carousels (and Reels) so they're shoppable. Scopes already granted
+  (`instagram_shopping_tag_products` + `catalog_management`). Build: pull the
+  brand's catalog products (Catalog API), let the user pick products and
+  position tags on the image in the composer, store `product_tags`, pass them at
+  publish time (`product_tags: [{product_id, x, y}]` on the IG media container).
+  Per-brand dependency: the IG account must be approved for Instagram Shopping
+  with a catalog connected in Commerce Manager. High-priority per Brooks.
+- **Meta Lead Ads → email routing** — in setup. Poll Meta leads per brand, email
+  the shop each new lead with all fields in the body and Reply-To = the lead's
+  email (hit-reply-to-respond). Reuses a shared email spine (Resend + send-email
+  + email_log). Blocked on: `leads_retrieval` scope (done) + system user Manage
+  Page on client Pages + Resend domain verify. See [[lead-ads-email-plan]].
+- **Post email notifications** — approved/failed/needs-approval emails via the
+  same email spine; per-user prefs. Build alongside Lead Ads email.
+- **Account Manager role scoped to brands** — managers currently see all brands;
+  add a user→brand assignment layer so each manager only sees their accounts.
+- **Unified customer messaging / inbox + AI auto-response** — respond to FB/IG
+  DMs/comments across monitored Pages from one place; AI-assisted replies. Scopes
+  now granted (`pages_messaging`, `pages_utility_messaging`, `instagram_manage_messages`).
+- **Page-growth & insights monitoring** — per-page follower/engagement trends
+  (`read_insights`, `instagram_manage_insights`). See [[meta-permissions-roadmap]].
+
 ## Done
 - **Smart Insights** — AI-flagged opportunities/issues per account (seasonality, sharp drops, trends).
 - **Insights grouping + pinning** — grouped by category; pin to capture a baseline and track impact over 30 days.
