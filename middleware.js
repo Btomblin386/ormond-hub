@@ -92,10 +92,12 @@ export async function middleware(req) {
   }
 
   // ---- ACCOUNT MANAGER: everything a creator can do, PLUS the cross-account
-  // agency overview (approvals, calendar, retries). Still no paid marketing,
-  // agency/account settings, team, reconciliation, onboarding, or billing. ----
+  // agency overview (approvals, calendar, retries) and the messaging Inbox.
+  // Still no paid marketing, agency/account settings, team, reconciliation,
+  // onboarding, or billing. ----
   if (role === "manager") {
-    if (PAID_APIS.some((a) => pathname.startsWith(a))) {
+    // Inbox is engagement work, not paid marketing — managers may use it.
+    if (!pathname.startsWith("/api/inbox") && PAID_APIS.some((a) => pathname.startsWith(a))) {
       return new NextResponse(JSON.stringify({ error: "Not permitted for your role" }), { status: 403, headers: { "Content-Type": "application/json" } });
     }
     const blockedPage =
@@ -108,7 +110,6 @@ export async function middleware(req) {
       /^\/accounts\/[^/]+\/google/.test(pathname) ||    // google analytics/ads tab
       /^\/accounts\/[^/]+\/settings/.test(pathname) ||  // account settings
       /^\/accounts\/[^/]+\/leads/.test(pathname) ||    // meta lead ads (agency only)
-      /^\/accounts\/[^/]+\/inbox/.test(pathname) ||    // messaging inbox (agency only)
       /^\/accounts\/[^/]+\/assistant/.test(pathname);   // account assistant
     if (blockedPage) {
       const url = req.nextUrl.clone();
