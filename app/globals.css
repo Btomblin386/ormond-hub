@@ -393,6 +393,31 @@ td a.rowlink { color: #4338ca; font-weight: 600; }
 .content-thumb.clickable:hover { transform: scale(1.05); box-shadow: 0 2px 10px rgba(0,0,0,.18); }
 .content-cap.clickable { cursor: pointer; }
 .content-cap.clickable:hover { text-decoration: underline; }
+/* Instagram Shopping product tags */
+.shop-box { border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 14px; background: #fcfcfd; }
+.shop-selected { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.shop-chip { display: inline-flex; align-items: center; gap: 6px; background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; border-radius: 999px; padding: 3px 6px 3px 4px; font-size: 12px; font-weight: 500; }
+.shop-chip img { width: 20px; height: 20px; border-radius: 999px; object-fit: cover; }
+.shop-chip button { border: 0; background: none; color: #4338ca; cursor: pointer; font-size: 13px; padding: 0 2px; }
+.shop-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; max-height: 240px; overflow-y: auto; }
+.shop-item { display: flex; align-items: center; gap: 9px; border: 1px solid #e5e7eb; background: #fff; border-radius: 8px; padding: 6px 10px; cursor: pointer; text-align: left; font-size: 12.5px; }
+.shop-item:hover { background: #f8fafc; }
+.shop-item.on { border-color: #6366f1; background: #eef2ff; }
+.shop-item img, .shop-noimg { width: 30px; height: 30px; border-radius: 6px; object-fit: cover; background: #f1f2f4; flex-shrink: 0; }
+.shop-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shop-price { color: #6b7280; font-size: 12px; }
+.shop-check { color: #4338ca; font-weight: 700; }
+
+/* Page growth */
+.growth-cards { display: flex; gap: 12px; flex-wrap: wrap; }
+.growth-card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 16px; min-width: 180px; background: #fff; }
+.growth-card .label { font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: .03em; }
+.growth-val { font-size: 22px; font-weight: 700; color: #111827; margin: 3px 0 4px; display: flex; align-items: baseline; gap: 8px; }
+.growth-delta { font-size: 12px; font-weight: 600; }
+.growth-delta.up { color: #15803d; }
+.growth-delta.down { color: #b91c1c; }
+.growth-spark { display: block; }
+
 /* Inbox (Messenger + IG DMs) */
 .inbox-grid { display: grid; grid-template-columns: 300px 1fr; gap: 14px; min-height: 420px; }
 @media (max-width: 860px) { .inbox-grid { grid-template-columns: 1fr; } }

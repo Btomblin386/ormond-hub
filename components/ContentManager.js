@@ -256,6 +256,10 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
   const [showLink, setShowLink] = useState(false);
   const [showFirst, setShowFirst] = useState(false);
   const [previewCh, setPreviewCh] = useState("instagram");
+  // Instagram Shopping product tags: [{product_id, name, image}]
+  const [productTags, setProductTags] = useState(() => (Array.isArray(editItem?.product_tags) ? editItem.product_tags : []));
+  const [shopOpen, setShopOpen] = useState(() => Array.isArray(editItem?.product_tags) && editItem.product_tags.length > 0);
+  const [shop, setShop] = useState({ loading: false, err: "", enabled: null, catalogId: null, products: [], q: "" });
   const hydratedRef = useRef(false);
   const draftKey = `hub:composer:${clientId}`;
 
@@ -329,6 +333,7 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
           if (typeof d.videoUrl === "string") setVideoUrl(d.videoUrl);
           if (typeof d.coverUrl === "string") setCoverUrl(d.coverUrl);
           if (typeof d.feedVideo === "boolean") setFeedVideo(d.feedVideo);
+          if (Array.isArray(d.productTags)) { setProductTags(d.productTags); if (d.productTags.length) setShopOpen(true); }
           if (typeof d.firstComment === "string") setFirstComment(d.firstComment);
           if (Array.isArray(d.selKeys)) { const k = d.selKeys.filter((x) => options.some((o) => o.key === x)); if (k.length) setSelKeys(k); }
           if (typeof d.customize === "boolean") setCustomize(d.customize);
@@ -345,16 +350,16 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
     const hasContent = caption.trim() || media.length || videoUrl.trim() || firstComment.trim() ||
       Object.values(variants).some((v) => v?.caption?.trim());
     try {
-      if (hasContent) localStorage.setItem(draftKey, JSON.stringify({ caption, variants, baseType, link, media, videoUrl, coverUrl, feedVideo, firstComment, selKeys, customize }));
+      if (hasContent) localStorage.setItem(draftKey, JSON.stringify({ caption, variants, baseType, link, media, videoUrl, coverUrl, feedVideo, firstComment, selKeys, customize, productTags }));
       else localStorage.removeItem(draftKey);
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editItem, caption, variants, baseType, link, media, videoUrl, coverUrl, feedVideo, firstComment, selKeys, customize]);
+  }, [editItem, caption, variants, baseType, link, media, videoUrl, coverUrl, feedVideo, firstComment, selKeys, customize, productTags]);
 
   function discardDraft() {
     try { localStorage.removeItem(draftKey); } catch {}
     setCaption(""); setVariants({ facebook: { caption: "", post_type: "feed" }, instagram: { caption: "", post_type: "feed" } });
-    setBaseType("feed"); setLink(""); setMedia([]); setVideoUrl(""); setCoverUrl(""); setFeedVideo(false); setFirstComment(""); setCustomize(false); setRestored(false);
+    setBaseType("feed"); setLink(""); setMedia([]); setVideoUrl(""); setCoverUrl(""); setFeedVideo(false); setFirstComment(""); setCustomize(false); setRestored(false); setProductTags([]); setShopOpen(false);
   }
 
   async function onFiles(e) {
@@ -396,6 +401,29 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
     } finally { setVUploading(false); setVProgress(null); }
   }
   function onVideoInput(e) { if (e.target.files?.length) onVideoFiles(e.target.files); }
+
+  async function loadShop(q = "") {
+    setShop((s) => ({ ...s, loading: true, err: "" }));
+    try {
+      let catalogId = shop.catalogId;
+      if (!catalogId) {
+        const r = await fetch("/api/shopping", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "catalogs", client_id: clientId }) });
+        const d = await r.json();
+        if (d.error) { setShop((s) => ({ ...s, loading: false, err: d.error })); return; }
+        if (!d.catalogs?.length) { setShop((s) => ({ ...s, loading: false, enabled: false })); return; }
+        catalogId = d.catalogs[0].id;
+      }
+      const r2 = await fetch("/api/shopping", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "products", client_id: clientId, catalog_id: catalogId, q }) });
+      const d2 = await r2.json();
+      if (d2.error) setShop((s) => ({ ...s, loading: false, catalogId, err: d2.error }));
+      else setShop((s) => ({ ...s, loading: false, catalogId, enabled: true, products: d2.products || [] }));
+    } catch (err) { setShop((s) => ({ ...s, loading: false, err: String(err.message || err) })); }
+  }
+  function toggleProduct(p) {
+    setProductTags((ts) => ts.some((t) => t.product_id === p.id)
+      ? ts.filter((t) => t.product_id !== p.id)
+      : ts.length >= 5 ? ts : [...ts, { product_id: p.id, name: p.name, image: p.image }]);
+  }
 
   async function onCoverInput(e) {
     const f = [...e.target.files].find((x) => x.type.startsWith("image/"));
@@ -452,6 +480,7 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
     // Post Now = approved with an immediate (past) schedule so the publisher grabs it this run.
     const shared = {
       clientId, caption, link: link || null, mediaUrls, coverUrl: (usesVideo && coverUrl) ? coverUrl : null,
+      productTags: selChans.includes("instagram") && productTags.length ? productTags : null,
       postType: baseType, variants: payloadVariants, firstComment: firstComment || null,
       scheduledAt: postNow ? new Date().toISOString() : (scheduledAt ? new Date(scheduledAt).toISOString() : null),
       publishNow: postNow,
@@ -687,6 +716,57 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
         </div>
       ) : (
         <button type="button" className="cmp-add" onClick={() => setShowFirst(true)}>+ Add a first comment</button>
+      )}
+
+      {igActive && !plan.some((p) => p.ch === "instagram" && p.type === "story") && (
+        !shopOpen ? (
+          <button type="button" className="cmp-add" onClick={() => { setShopOpen(true); loadShop(); }}>🏷 Tag products <span className="muted" style={{ fontWeight: 400 }}>(Instagram Shopping)</span></button>
+        ) : (
+          <div className="cmp-field shop-box">
+            <div className="cmp-label-row">
+              <label>Product tags <span className="muted">(Instagram · up to 5)</span></label>
+              <button type="button" className="cmp-collapse" onClick={() => { setProductTags([]); setShopOpen(false); }}>Remove all</button>
+            </div>
+            {productTags.length > 0 && (
+              <div className="shop-selected">
+                {productTags.map((t) => (
+                  <span key={t.product_id} className="shop-chip">
+                    {t.image && <img src={t.image} alt="" />}
+                    {t.name}
+                    <button type="button" onClick={() => setProductTags((ts) => ts.filter((x) => x.product_id !== t.product_id))}>×</button>
+                  </span>
+                ))}
+              </div>
+            )}
+            {shop.enabled === false ? (
+              <div className="muted" style={{ fontSize: 12 }}>This brand isn&apos;t set up for Instagram Shopping yet — connect a product catalog in Meta Commerce Manager, then tags become available here.</div>
+            ) : (
+              <>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input type="text" value={shop.q} placeholder="Search products…" onChange={(e) => setShop((s) => ({ ...s, q: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); loadShop(shop.q); } }} style={{ flex: 1 }} />
+                  <button type="button" className="social-btn" disabled={shop.loading} onClick={() => loadShop(shop.q)}>{shop.loading ? "Loading…" : "Search"}</button>
+                </div>
+                {shop.err && <div className="cmp-warn" style={{ marginTop: 6 }}>⚠ {shop.err}</div>}
+                {shop.products.length > 0 && (
+                  <div className="shop-list">
+                    {shop.products.map((p) => {
+                      const on = productTags.some((t) => t.product_id === p.id);
+                      return (
+                        <button key={p.id} type="button" className={"shop-item" + (on ? " on" : "")} onClick={() => toggleProduct(p)}>
+                          {p.image ? <img src={p.image} alt="" /> : <span className="shop-noimg" />}
+                          <span className="shop-name">{p.name}</span>
+                          {p.price && <span className="shop-price">{p.price}</span>}
+                          <span className="shop-check">{on ? "✓" : "+"}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )
       )}
 
       <div className="cmp-field">
