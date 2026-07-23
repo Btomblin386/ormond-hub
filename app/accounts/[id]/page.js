@@ -10,7 +10,8 @@ import CampaignStudio from "../../../components/CampaignStudio";
 import AdsManager from "../../../components/AdsManager";
 import RulesManager from "../../../components/RulesManager";
 import AccountTabs from "../../../components/AccountTabs";
-import { accountById, accountTotals, accountTrend, accountCampaigns, clientsWithGa4, insightsForClient, insightsGeneratedAt, storeMonthly, pinnedForClient, campaignPlanForClient, accountCampaignsManaged, adWritesForAccount, rulesForAccount, ruleEventsForAccount, chatHistory } from "../../../lib/db";
+import LeadsPanel from "../../../components/LeadsPanel";
+import { accountById, accountTotals, accountTrend, accountCampaigns, clientsWithGa4, insightsForClient, insightsGeneratedAt, storeMonthly, pinnedForClient, campaignPlanForClient, accountCampaignsManaged, adWritesForAccount, rulesForAccount, ruleEventsForAccount, chatHistory, leadsForClient, brandSettings, emailEverSent } from "../../../lib/db";
 import { money, num, roas, roasClass } from "../../../lib/format";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -29,7 +30,7 @@ export default async function AccountDetail({ params, searchParams }) {
   if (!acct) notFound();
   const adId = acct.ad_account_id;
 
-  const [ga4Clients, insights, insightsAt, store, pinned, campaignPlan, chatMsgs] = await Promise.all([
+  const [ga4Clients, insights, insightsAt, store, pinned, campaignPlan, chatMsgs, leads, brand, emailOk] = await Promise.all([
     clientsWithGa4(),
     insightsForClient(acct.client),
     insightsGeneratedAt(acct.client),
@@ -37,6 +38,9 @@ export default async function AccountDetail({ params, searchParams }) {
     pinnedForClient(acct.client),
     campaignPlanForClient(acct.client),
     chatHistory(acct.id).catch(() => []),
+    leadsForClient(acct.client_id).catch(() => []),
+    brandSettings(acct.client_id).catch(() => ({})),
+    emailEverSent().catch(() => false),
   ]);
 
   let totals = { spend: 0, revenue: 0, conversions: 0, clicks: 0, impressions: 0 };
@@ -205,6 +209,11 @@ export default async function AccountDetail({ params, searchParams }) {
       </div>
       </>
       )}
+
+      <div id="leads">
+        <LeadsPanel clientId={acct.client_id} client={acct.client} leads={leads}
+          leadEmails={brand?.lead_emails || []} emailConfigured={emailOk} />
+      </div>
     </Shell>
   );
 }

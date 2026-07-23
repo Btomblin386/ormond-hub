@@ -25,6 +25,12 @@ export async function POST(req) {
       await setLeadStatus(b.id, b.status);
       return NextResponse.json({ ok: true });
     }
+    if (b.op === "email_lead") {
+      if (!b.id) return NextResponse.json({ error: "missing id" }, { status: 400 });
+      const r = await fetch(INGEST_FN, { method: "POST", headers: { Authorization: `Bearer ${ANON}`, "Content-Type": "application/json" }, body: JSON.stringify({ action: "email_lead", lead_id: b.id }) });
+      const d = await r.json();
+      return NextResponse.json(d, { status: r.status });
+    }
     if (b.op === "sync") {
       // On-demand pull (the cron also runs every 10 min)
       const r = await fetch(INGEST_FN, { method: "POST", headers: { Authorization: `Bearer ${ANON}`, "Content-Type": "application/json" }, body: "{}" });

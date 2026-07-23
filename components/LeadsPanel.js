@@ -36,6 +36,15 @@ export default function LeadsPanel({ clientId, client, leads, leadEmails, emailC
       router.refresh();
     } finally { setBusy(""); }
   }
+  async function emailLead(id) {
+    setBusy(id + "em");
+    try {
+      const r = await fetch("/api/leads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "email_lead", id }) });
+      const d = await r.json();
+      if (d.error) flash("Error: " + d.error);
+      else { flash(`Emailed to ${(d.to || []).join(", ")}.`); router.refresh(); }
+    } finally { setBusy(""); }
+  }
   async function sync() {
     setBusy("sync");
     try {
@@ -86,6 +95,7 @@ export default function LeadsPanel({ clientId, client, leads, leadEmails, emailC
                 <div className="lead-contact">
                   {l.email && <a href={`mailto:${l.email}`} onClick={(e) => e.stopPropagation()}>{l.email}</a>}
                   {l.phone && <a href={`tel:${l.phone}`} onClick={(e) => e.stopPropagation()}>{l.phone}</a>}
+                  {l.emailed_at && <span className="lead-sent" title="Notification email sent to the configured recipients">✉ Sent {fmtWhen(l.emailed_at)}</span>}
                   {l.email_error && <span className="err-txt" style={{ fontSize: 11.5 }}>⚠ email failed: {l.email_error}</span>}
                 </div>
                 {openId === l.id && (
@@ -100,6 +110,10 @@ export default function LeadsPanel({ clientId, client, leads, leadEmails, emailC
                 )}
               </div>
               <div className="content-actions">
+                <button className="social-btn" disabled={busy === l.id + "em"} onClick={() => emailLead(l.id)}
+                  title={l.emailed_at ? "Send this lead's email again" : "Email this lead to the configured recipients"}>
+                  {busy === l.id + "em" ? "Sending…" : l.emailed_at ? "↻ Resend email" : "✉ Email lead"}
+                </button>
                 {l.status !== "contacted"
                   ? <button className="cal-approve" disabled={busy === l.id} onClick={() => mark(l.id, "contacted")}>Mark contacted</button>
                   : <button disabled={busy === l.id} onClick={() => mark(l.id, "new")}>Reopen</button>}

@@ -10,6 +10,7 @@ const PAID_SECTIONS = [
   { hash: "campaigns", label: "Campaigns" },
   { hash: "ads", label: "Ads Manager" },
   { hash: "rules", label: "Automated Rules" },
+  { hash: "leads", label: "Leads" },
 ];
 const CONTENT_SECTIONS = [
   { hash: "posts", label: "Posts" },
