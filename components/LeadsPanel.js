@@ -17,8 +17,13 @@ export default function LeadsPanel({ clientId, client, leads, leadEmails, emailC
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
   const [emails, setEmails] = useState((leadEmails || []).join(", "));
+  const [savedEmails, setSavedEmails] = useState(leadEmails || []);
   const [openId, setOpenId] = useState(null);
   const flash = (t) => { setMsg(t); setTimeout(() => setMsg(""), 6000); };
+
+  // Which addresses are typed now, and whether they differ from what's saved.
+  const parsed = emails.split(/[,;\s]+/).map((e) => e.trim()).filter(Boolean);
+  const dirty = JSON.stringify(parsed) !== JSON.stringify(savedEmails);
 
   async function saveEmails() {
     setBusy("emails");
@@ -26,7 +31,7 @@ export default function LeadsPanel({ clientId, client, leads, leadEmails, emailC
       const r = await fetch("/api/leads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "set_emails", clientId, emails }) });
       const d = await r.json();
       if (d.error) flash("Error: " + d.error);
-      else { setEmails((d.emails || []).join(", ")); flash(d.emails?.length ? `Saved — new leads will be emailed to ${d.emails.length} recipient(s).` : "Recipients cleared — leads are stored here but not emailed."); router.refresh(); }
+      else { setSavedEmails(d.emails || []); setEmails((d.emails || []).join(", ")); flash(d.emails?.length ? `Saved — new leads will be emailed to ${d.emails.join(", ")}.` : "Recipients cleared — leads are stored here but not emailed."); router.refresh(); }
     } finally { setBusy(""); }
   }
   async function mark(id, status) {
@@ -69,10 +74,18 @@ export default function LeadsPanel({ clientId, client, leads, leadEmails, emailC
       <p className="note">Lead-form submissions from {client}&apos;s Meta ads, pulled automatically every 10 minutes. New leads are emailed to the recipients below — the email&apos;s Reply-To is the customer, so replying goes straight to them.</p>
 
       <div className="lead-config">
-        <label>Email new leads to <span className="muted">(the shop&apos;s inbox — comma-separate multiple)</span></label>
+        {savedEmails.length > 0 ? (
+          <div className="lead-recipients-ok">
+            <span className="lead-ok-dot">✓</span>
+            <span>New leads are emailed to <b>{savedEmails.join(", ")}</b> — the customer&apos;s email is the Reply-To, so replying goes straight to them.</span>
+          </div>
+        ) : (
+          <div className="lead-recipients-none">No recipients set yet — leads are collected below but <b>not emailed</b>. Add an address to start sending.</div>
+        )}
+        <label style={{ marginTop: 10 }}>{savedEmails.length ? "Change recipients" : "Email new leads to"} <span className="muted">(the shop&apos;s inbox — comma-separate multiple)</span></label>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <input type="text" value={emails} onChange={(e) => setEmails(e.target.value)} placeholder="service@shop.com, mike@shop.com" style={{ flex: 1, minWidth: 260 }} />
-          <button className="push-create" disabled={busy === "emails"} onClick={saveEmails}>{busy === "emails" ? "Saving…" : "Save recipients"}</button>
+          <button className="push-create" disabled={busy === "emails" || !dirty} onClick={saveEmails}>{busy === "emails" ? "Saving…" : dirty ? "Save recipients" : "✓ Saved"}</button>
         </div>
         {!emailConfigured && <div className="cmp-warn" style={{ marginTop: 8 }}>⚠ Email sending isn&apos;t configured yet (Resend key + domain). Leads are being collected here; emails start once it&apos;s set up in Settings.</div>}
       </div>

@@ -444,6 +444,9 @@ td a.rowlink { color: #4338ca; font-weight: 600; }
 /* Leads (Meta lead ads) */
 .lead-config { border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; background: #fcfcfd; }
 .lead-config > label { display: block; font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+.lead-recipients-ok { display: flex; align-items: flex-start; gap: 8px; background: #ecfdf5; border: 1px solid #bbf7d0; border-radius: 8px; padding: 9px 12px; font-size: 13px; color: #14532d; line-height: 1.45; }
+.lead-ok-dot { color: #15803d; font-weight: 800; flex-shrink: 0; }
+.lead-recipients-none { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 9px 12px; font-size: 13px; color: #92400e; }
 .lead-config input { padding: 8px 11px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 13px; }
 .lead-list { display: flex; flex-direction: column; }
 .lead-row { display: flex; align-items: flex-start; gap: 12px; padding: 11px 0; border-bottom: 1px solid #f1f2f4; }
