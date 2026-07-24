@@ -34,67 +34,103 @@ function smoothPath(P) {
   }
   return d;
 }
+// Round a raw max up to a "nice" tick ceiling (1/2/2.5/5 × 10^k) so the
+// y-axis reads $20/$40/$60/$80, never $61/$81.
+function niceCeil(v) {
+  if (v <= 0) return 1;
+  const p = Math.pow(10, Math.floor(Math.log10(v)));
+  for (const m of [1, 2, 2.5, 4, 5, 8, 10]) if (v <= m * p) return m * p;
+  return 10 * p;
+}
+// Measure the container's real pixel width so strokes never stretch.
+function useMeasure() {
+  const [el, setEl] = useState(null);
+  const [w, setW] = useState(0);
+  useEffect(() => {
+    if (!el) return;
+    const ro = new ResizeObserver((es) => setW(es[0].contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [el]);
+  return [setEl, w];
+}
+
 function Spark({ series }) {
-  if (!series?.length) return null;
+  const [ref, w] = useMeasure();
+  if (!series?.length) return <div ref={ref} className="dw-spark" />;
   const max = Math.max(...series.map((p) => p.v), 1);
   return (
-    <svg className="dw-spark" viewBox="0 0 96 26" preserveAspectRatio="none">
-      <path d={smoothPath(xy(series, 96, 26, max))} fill="none" stroke="#6366f1" strokeWidth="1.6" />
-    </svg>
+    <div ref={ref} className="dw-spark">
+      {w > 0 && (
+        <svg width={w} height={26}>
+          <path d={smoothPath(xy(series, w, 26, max, 3))} fill="none" stroke="#6366f1" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+      )}
+    </div>
   );
 }
 
-// Shared hoverable chart: line or bars, optional prev-period overlay + axes.
+// Shared hoverable chart: pixel-accurate, crisp strokes, gradient area fill.
 function Chart({ series, prevSeries, kind = "line", fmt, h = 110, axes = false }) {
-  const [hov, setHov] = useState(null); // index
-  if (!series?.length) return null;
-  const W = 320, PADL = axes ? 40 : 0, plotW = W - PADL;
-  const max = Math.max(...series.map((p) => p.v), ...(prevSeries || []).map((p) => p.v), 1);
-  const P = xy(series, plotW, h, max);
-  const PP = prevSeries?.length ? xy(prevSeries, plotW, h, max) : null;
+  const [hov, setHov] = useState(null);
+  const [ref, mw] = useMeasure();
+  const gid = "g" + Math.abs((series?.[0]?.d || "x").split("").reduce((a, c) => a * 31 + c.charCodeAt(0) | 0, h));
+  if (!series?.length) return <div ref={ref} />;
+  const W = Math.max(mw, 60), PADL = axes ? 48 : 0, PADT = 10, PADB = 4, plotW = W - PADL, plotH = h - PADT - PADB;
+  const max = niceCeil(Math.max(...series.map((p) => p.v), ...(prevSeries || []).map((p) => p.v), 1));
+  const Y = (v) => PADT + plotH - (v / max) * plotH;
+  const step = series.length > 1 ? plotW / (series.length - 1) : plotW;
+  const P = series.map((p, i) => [i * step, Y(p.v)]);
+  const PP = prevSeries?.length ? prevSeries.map((p, i) => [i * step, Y(p.v)]) : null;
   const bw = plotW / series.length;
   const onMove = (e) => {
     const r = e.currentTarget.getBoundingClientRect();
-    const fx = (e.clientX - r.left) / r.width * W - PADL;
-    setHov(Math.max(0, Math.min(series.length - 1, Math.round(fx / plotW * (series.length - 1)))));
+    setHov(Math.max(0, Math.min(series.length - 1, Math.round((e.clientX - r.left - PADL) / plotW * (series.length - 1)))));
   };
-  const grid = axes ? [0.25, 0.5, 0.75, 1] : [];
   return (
-    <div className="dw-chartwrap" onMouseLeave={() => setHov(null)}>
-      <svg className="dw-chart" style={{ height: h }} viewBox={`0 0 ${W} ${h}`} preserveAspectRatio="none" onMouseMove={onMove}>
-        {grid.map((g) => (
+    <div className="dw-chartwrap" ref={ref} onMouseLeave={() => setHov(null)}>
+      {mw > 0 && (
+      <svg width={W} height={h} onMouseMove={onMove} style={{ display: "block" }}>
+        <defs>
+          <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#6366f1" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="#6366f1" stopOpacity="0.01" />
+          </linearGradient>
+        </defs>
+        {(axes ? [0.25, 0.5, 0.75, 1] : []).map((g) => (
           <g key={g}>
-            <line x1={PADL} x2={W} y1={h - 2 - g * (h - 4)} y2={h - 2 - g * (h - 4)} stroke="#eef0f4" strokeWidth="1" />
-            <text x={PADL - 4} y={h - 2 - g * (h - 4) + 3} textAnchor="end" className="dw-axis">{fmtValue(max * g, fmt)}</text>
+            <line x1={PADL} x2={W} y1={Y(max * g)} y2={Y(max * g)} stroke="#eef0f4" strokeWidth="1" />
+            <text x={PADL - 8} y={Y(max * g) + 3.5} textAnchor="end" className="dw-axis">{fmtValue(max * g, fmt)}</text>
           </g>
         ))}
         <g transform={`translate(${PADL},0)`}>
           {kind === "column"
-            ? series.map((p, i) => {
-                const bh = (p.v / max) * (h - 6);
-                return <rect key={i} x={i * bw + bw * 0.18} y={h - 2 - bh} width={bw * 0.64} height={bh} rx="1.5"
-                  fill="#6366f1" opacity={hov === i ? 1 : 0.8} />;
-              })
+            ? series.map((p, i) => (
+                <rect key={i} x={i * bw + bw * 0.18} y={Y(p.v)} width={Math.max(1, bw * 0.64)} height={Math.max(0, PADT + plotH - Y(p.v))}
+                  rx="1.5" fill="#6366f1" opacity={hov === i ? 1 : 0.8} />
+              ))
             : (
               <>
-                {PP && <path d={smoothPath(PP)} fill="none" stroke="#d7dbe3" strokeWidth="1.5" strokeDasharray="4 3" />}
-                <path d={smoothPath(P)} fill="none" stroke="#6366f1" strokeWidth="2" />
-                {hov != null && <circle cx={P[hov][0]} cy={P[hov][1]} r="3.5" fill="#6366f1" />}
-                {hov != null && PP && <circle cx={PP[hov][0]} cy={PP[hov][1]} r="3" fill="#b6bcc7" />}
+                <path d={smoothPath(P) + `L${plotW},${PADT + plotH}L0,${PADT + plotH}Z`} fill={`url(#${gid})`} stroke="none" />
+                {PP && <path d={smoothPath(PP)} fill="none" stroke="#cfd4dd" strokeWidth="1.5" strokeDasharray="4 3" />}
+                <path d={smoothPath(P)} fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                {hov != null && <circle cx={P[hov][0]} cy={P[hov][1]} r="4" fill="#fff" stroke="#6366f1" strokeWidth="2" />}
+                {hov != null && PP && <circle cx={PP[hov][0]} cy={PP[hov][1]} r="3" fill="#fff" stroke="#b6bcc7" strokeWidth="1.5" />}
               </>
             )}
-          {hov != null && <line x1={P[hov][0]} x2={P[hov][0]} y1="0" y2={h} stroke="#c7d2fe" strokeWidth="1" />}
+          {hov != null && <line x1={P[hov][0]} x2={P[hov][0]} y1={PADT} y2={PADT + plotH} stroke="#c7d2fe" strokeWidth="1" />}
         </g>
       </svg>
+      )}
       {axes && (
-        <div className="dw-xlabels">
+        <div className="dw-xlabels" style={{ paddingLeft: PADL }}>
           <span>{fmtDay(series[0].d)}</span>
           <span>{fmtDay(series[Math.floor(series.length / 2)].d)}</span>
           <span>{fmtDay(series[series.length - 1].d)}</span>
         </div>
       )}
-      {hov != null && (
-        <div className="dw-tip" style={{ left: `${((P[hov][0] + PADL) / W) * 100}%` }}>
+      {hov != null && mw > 0 && (
+        <div className="dw-tip" style={{ left: Math.min(Math.max(P[hov][0] + PADL, 60), W - 60) }}>
           <div className="dw-tip-date">{fmtDay(series[hov].d)}</div>
           <div><span className="dw-dot" style={{ background: "#6366f1" }} /> {fmtValue(series[hov].v, fmt)}</div>
           {prevSeries?.[hov] && <div className="dw-tip-prev"><span className="dw-dot" style={{ background: "#c3c8d2" }} /> {fmtValue(prevSeries[hov].v, fmt)} <span>prev</span></div>}
