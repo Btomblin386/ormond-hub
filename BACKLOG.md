@@ -45,3 +45,10 @@ One task at a time.
 - **Insights grouping + pinning** — grouped by category; pin to capture a baseline and track impact over 30 days.
 - **Account chat** — free-form Q&A per account with full context (Supabase-hosted, no Vercel key needed).
 - **Campaign Studio** — evaluates top campaigns vs. trending products, lists content/materials, drafts 3 campaigns to best audiences.
+
+## Client Analytics Dashboards (AgencyAnalytics parity — spec: agencyanalytics-dashboard-build-spec.md)
+- [x] Phase 1: widget engine + normalized metrics (Meta Ads/GA4/FB/IG/Leads), auto-provisioned Overview, add/edit/move/delete widgets, client-portal read-only access
+- [ ] Phase 2: drag-grid builder polish (drag-resize, sections drag, undo, sample-data mode)
+- [ ] Phase 3: GA4 channel-segment ingestion (full donut-by-channel), more sources (Google Ads, email)
+- [ ] Phase 4: portal branding (logo, brand color, custom subdomain), scheduled PDF/email reports
+- [ ] Phase 5: custom formula metrics, KPIs/goals, benchmarks, AI insight summaries

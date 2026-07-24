@@ -13,6 +13,11 @@ export default function AccountTabs({ accountId, active, days = 30, role = "agen
           Google
         </Link>
       )}
+      {role !== "creator" && (
+        <Link href={`/accounts/${accountId}/dashboard`} className={"acct-tab" + (active === "dashboard" ? " active" : "")}>
+          Dashboard
+        </Link>
+      )}
       <Link href={`/accounts/${accountId}/content`} className={"acct-tab" + (active === "content" ? " active" : "")}>
         Content
       </Link>

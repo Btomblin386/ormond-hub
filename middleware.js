@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 const PUBLIC = ["/login", "/agency-master-login", "/api/login", "/api/media", "/api/meta-webhook", "/privacy", "/terms", "/data-deletion"];
 
 // Paid-marketing APIs that creators/clients may not call
-const PAID_APIS = ["/api/manage", "/api/create", "/api/rules", "/api/account-settings", "/api/campaign-plan", "/api/audiences", "/api/pin", "/api/users", "/api/analytics", "/api/analytics-summary", "/api/oauth", "/api/tasks", "/api/leads", "/api/inbox", "/api/notes"];
+const PAID_APIS = ["/api/manage", "/api/create", "/api/rules", "/api/account-settings", "/api/campaign-plan", "/api/audiences", "/api/pin", "/api/users", "/api/analytics", "/api/analytics-summary", "/api/oauth", "/api/tasks", "/api/leads", "/api/inbox", "/api/notes", "/api/dashboard"];
 
 function b64urlFromBytes(bytes) {
   let bin = "";
@@ -76,12 +76,15 @@ export async function middleware(req) {
 
   if (role === "agency") return NextResponse.next();
 
-  // ---- CLIENT: locked to their own brand's Content only ----
+  // ---- CLIENT: locked to their own brand's Content + analytics Dashboard
+  // (the read-only client portal; the dashboard page is server-rendered, so
+  // no dashboard API access is needed or granted). ----
   if (role === "client") {
     const home = clientId ? `/accounts/${clientId}/content` : "/login";
     const okApi = ["/api/content", "/api/content-media", "/api/nav", "/api/me", "/api/logout"];
     const allowed =
       (clientId && pathname.startsWith(`/accounts/${clientId}/content`)) ||
+      (clientId && pathname.startsWith(`/accounts/${clientId}/dashboard`)) ||
       okApi.some((a) => pathname.startsWith(a));
     if (!allowed) {
       const url = req.nextUrl.clone();
@@ -96,8 +99,9 @@ export async function middleware(req) {
   // Still no paid marketing, agency/account settings, team, reconciliation,
   // onboarding, or billing. ----
   if (role === "manager") {
-    // Inbox + client notes are account work, not paid marketing — managers may use them.
-    if (!pathname.startsWith("/api/inbox") && !pathname.startsWith("/api/notes") && PAID_APIS.some((a) => pathname.startsWith(a))) {
+    // Inbox, client notes and dashboard editing are account work, not paid
+    // marketing — managers may use them.
+    if (!pathname.startsWith("/api/inbox") && !pathname.startsWith("/api/notes") && !pathname.startsWith("/api/dashboard") && PAID_APIS.some((a) => pathname.startsWith(a))) {
       return new NextResponse(JSON.stringify({ error: "Not permitted for your role" }), { status: 403, headers: { "Content-Type": "application/json" } });
     }
     const blockedPage =
@@ -139,6 +143,7 @@ export async function middleware(req) {
       /^\/accounts\/[^/]+\/leads/.test(pathname) ||    // meta lead ads (agency only)
       /^\/accounts\/[^/]+\/inbox/.test(pathname) ||    // messaging inbox (agency only)
       /^\/accounts\/[^/]+\/notes/.test(pathname) ||    // client notes board (agency/manager)
+      /^\/accounts\/[^/]+\/dashboard/.test(pathname) ||  // analytics dashboard (not creator work)
       /^\/accounts\/[^/]+\/assistant/.test(pathname);   // account assistant
     if (blockedPage) {
       const url = req.nextUrl.clone();
