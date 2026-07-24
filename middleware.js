@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 const PUBLIC = ["/login", "/agency-master-login", "/api/login", "/api/media", "/api/meta-webhook", "/privacy", "/terms", "/data-deletion"];
 
 // Paid-marketing APIs that creators/clients may not call
-const PAID_APIS = ["/api/manage", "/api/create", "/api/rules", "/api/account-settings", "/api/campaign-plan", "/api/audiences", "/api/pin", "/api/users", "/api/analytics", "/api/analytics-summary", "/api/oauth", "/api/tasks", "/api/leads", "/api/inbox"];
+const PAID_APIS = ["/api/manage", "/api/create", "/api/rules", "/api/account-settings", "/api/campaign-plan", "/api/audiences", "/api/pin", "/api/users", "/api/analytics", "/api/analytics-summary", "/api/oauth", "/api/tasks", "/api/leads", "/api/inbox", "/api/notes"];
 
 function b64urlFromBytes(bytes) {
   let bin = "";
@@ -96,8 +96,8 @@ export async function middleware(req) {
   // Still no paid marketing, agency/account settings, team, reconciliation,
   // onboarding, or billing. ----
   if (role === "manager") {
-    // Inbox is engagement work, not paid marketing — managers may use it.
-    if (!pathname.startsWith("/api/inbox") && PAID_APIS.some((a) => pathname.startsWith(a))) {
+    // Inbox + client notes are account work, not paid marketing — managers may use them.
+    if (!pathname.startsWith("/api/inbox") && !pathname.startsWith("/api/notes") && PAID_APIS.some((a) => pathname.startsWith(a))) {
       return new NextResponse(JSON.stringify({ error: "Not permitted for your role" }), { status: 403, headers: { "Content-Type": "application/json" } });
     }
     const blockedPage =
@@ -138,6 +138,7 @@ export async function middleware(req) {
       /^\/accounts\/[^/]+\/settings/.test(pathname) ||  // account settings
       /^\/accounts\/[^/]+\/leads/.test(pathname) ||    // meta lead ads (agency only)
       /^\/accounts\/[^/]+\/inbox/.test(pathname) ||    // messaging inbox (agency only)
+      /^\/accounts\/[^/]+\/notes/.test(pathname) ||    // client notes board (agency/manager)
       /^\/accounts\/[^/]+\/assistant/.test(pathname);   // account assistant
     if (blockedPage) {
       const url = req.nextUrl.clone();

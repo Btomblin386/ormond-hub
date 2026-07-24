@@ -33,8 +33,8 @@ function NotifThumb({ item }) {
 export default function NotificationsFeed({ data }) {
   const router = useRouter();
   const [busy, setBusy] = useState("");
-  const { spendDrops = [], todos = [], failed = [], ruleEvents = [], insights = [], overdue = [], stuck = [], reminders = [], taskResults = [] } = data || {};
-  const total = spendDrops.length + todos.length + failed.length + ruleEvents.length + insights.length + overdue.length + stuck.length + reminders.length + taskResults.length;
+  const { spendDrops = [], todos = [], failed = [], ruleEvents = [], insights = [], overdue = [], stuck = [], reminders = [], taskResults = [], noteReminders = [] } = data || {};
+  const total = spendDrops.length + todos.length + failed.length + ruleEvents.length + insights.length + overdue.length + stuck.length + reminders.length + taskResults.length + noteReminders.length;
 
   async function dismiss(key) {
     setBusy(key);
@@ -89,6 +89,22 @@ export default function NotificationsFeed({ data }) {
             <div className="notif-sub">{t.title}</div>
           </div>
           <button className="rule-ack" disabled={busy === t.id} onClick={() => taskOp(t.id, "dismiss")}>Done</button>
+        </div>
+      ))}
+      {noteReminders.map((t) => (
+        <div key={"nr" + t.id} className="notif todo">
+          <span className="notif-dot approval" />
+          <div className="notif-body">
+            <div className="notif-title">🔔 Note reminder · <Link href={`/accounts/${t.client_id}/notes`}>{t.client}</Link> <span className="notif-when">{fmtWhen(t.due_at)}</span></div>
+            <div className="notif-sub">{t.group_name ? `${t.group_name} · ` : ""}{t.title}</div>
+          </div>
+          <button className="rule-ack" disabled={busy === "nr" + t.id} onClick={async () => {
+            setBusy("nr" + t.id);
+            try {
+              await fetch("/api/notes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "remind_ack", id: t.id }) });
+              router.refresh();
+            } finally { setBusy(""); }
+          }}>Done</button>
         </div>
       ))}
       {taskResults.map((t) => (
