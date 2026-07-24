@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import WhenPicker, { TimePicker } from "./WhenPicker";
+import PostPreview from "./PostPreview";
 
 const STATUS_LABEL = {
   draft: "Draft", needs_approval: "Needs approval", needs_revisions: "Needs revisions", approved: "Approved",
@@ -53,7 +54,8 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
   const [qCaption, setQCaption] = useState("");
   const [qNote, setQNote] = useState("");
   const [qWhen, setQWhen] = useState("");
-  useEffect(() => { setQCaption(sel?.caption || ""); setQNote(sel?.note || ""); setQWhen(sel?.scheduled_at ? toLocalInput(sel.scheduled_at) : ""); }, [sel]);
+  const [pvCh, setPvCh] = useState(null);
+  useEffect(() => { setQCaption(sel?.caption || ""); setQNote(sel?.note || ""); setQWhen(sel?.scheduled_at ? toLocalInput(sel.scheduled_at) : ""); setPvCh(sel?.channels?.[0] || null); }, [sel]);
 
   async function saveQuickTime() {
     setBusy("q");
@@ -344,25 +346,31 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
       )}
 
       {/* ------- content item quick view ------- */}
-      {sel && (
+      {sel && (() => {
+        // Full-size live preview (same card as the composer) so posts can be
+        // reviewed and approved right here without a round-trip to the composer.
+        const allMedia = Array.isArray(sel.media_urls) ? sel.media_urls : [];
+        const vid = allMedia.find(isVideoUrl) || "";
+        const pvImgs = allMedia.filter((u) => !isVideoUrl(u));
+        const pvType = sel.variants?.[pvCh]?.post_type || sel.post_type || "feed";
+        const pvCaption = sel.variants?.[pvCh]?.caption || qCaption;
+        const pvOptions = [
+          { ch: "facebook", label: sel.identity_name || sel.client },
+          { ch: "instagram", label: sel.identity_ig || sel.client },
+          { ch: "tiktok", label: sel.client },
+        ];
+        return (
         <div className="cal-modal" onClick={() => setSel(null)}>
-          <div className="cal-modal-inner" onClick={(e) => e.stopPropagation()}>
+          <div className="cal-modal-inner wide" onClick={(e) => e.stopPropagation()}>
             <div className="cal-modal-top">
               <span className={"cbadge " + sel.status}>{STATUS_LABEL[sel.status]}</span>
               <span className="cal-modal-client">{sel.client}</span>
               <button className="cal-x" onClick={() => setSel(null)}>×</button>
             </div>
             <div className="cal-modal-when">{(sel.channels || []).join(" + ")} · {sel.scheduled_at ? fmtWhen(sel.scheduled_at) : "no date"}</div>
-            {sel.cover_url ? (
-              <div className="cal-modal-media"><img src={sel.cover_url} alt="" /></div>
-            ) : Array.isArray(sel.media_urls) && sel.media_urls.length > 0 && (
-              <div className="cal-modal-media">{sel.media_urls.slice(0, 4).map((u, j) => (
-                isVideoUrl(u)
-                  ? <video key={j} src={u} muted playsInline preload="metadata" controls />
-                  : <img key={j} src={u} alt="" />
-              ))}</div>
-            )}
 
+            <div className="cal-modal-cols">
+              <div className="cal-modal-left">
             {sel.status === "published" || sel.status === "publishing" ? (
               <div className="cal-modal-cap">{sel.caption || "(no caption)"}</div>
             ) : (
@@ -374,7 +382,7 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
                 </div>
                 {qWhen && <div className="muted" style={{ fontSize: 11, marginBottom: 6 }}>📅 {fmtWhen(qWhen)}</div>}
                 <label>Caption</label>
-                <textarea rows={3} value={qCaption} onChange={(e) => setQCaption(e.target.value)} />
+                <textarea rows={5} value={qCaption} onChange={(e) => setQCaption(e.target.value)} />
                 <label>Note {sel.status === "needs_revisions" ? "· revisions requested" : "(for the team)"}</label>
                 <textarea rows={2} value={qNote} onChange={(e) => setQNote(e.target.value)} placeholder="Leave a note — e.g. for Brie to review…" />
                 <div className="cal-quick-actions">
@@ -408,9 +416,26 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
                 }}>Delete</button>
               )}
             </div>
+              </div>
+
+              <div className="cal-modal-pv">
+                {(sel.channels || []).length > 1 && (
+                  <div className="pv-tabs" style={{ marginBottom: 8 }}>
+                    {sel.channels.map((ch) => (
+                      <button key={ch} type="button" className={"pv-tab" + (pvCh === ch ? " on" : "")} onClick={() => setPvCh(ch)}>
+                        {{ facebook: "Facebook", instagram: "Instagram", tiktok: "TikTok" }[ch] || ch}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <PostPreview channel={pvCh || "facebook"} options={pvOptions} caption={pvCaption} postType={pvType}
+                  usesVideo={!!vid} videoUrl={vid} coverUrl={sel.cover_url} media={pvImgs} />
+              </div>
+            </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

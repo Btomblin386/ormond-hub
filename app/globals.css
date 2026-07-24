@@ -989,3 +989,10 @@ video.mention-media { max-width: 240px; border-radius: 8px; }
 .ni-sub-add:hover { color: #4338ca; }
 .ni-add-row.sub { background: #fbfcfe; padding-left: 40px; }
 .ni-detail.sub { padding-left: 44px; }
+
+/* ---------- Calendar quick-view: full post preview pane ---------- */
+.cal-modal-inner.wide { max-width: 780px; max-height: 92vh; overflow-y: auto; }
+.cal-modal-cols { display: flex; gap: 18px; align-items: flex-start; }
+.cal-modal-left { flex: 1; min-width: 0; }
+.cal-modal-pv { width: 300px; flex-shrink: 0; }
+@media (max-width: 720px) { .cal-modal-cols { flex-direction: column; } .cal-modal-pv { width: 100%; order: -1; } }
