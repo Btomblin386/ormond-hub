@@ -5,8 +5,8 @@ import { useEffect, useRef, useState } from "react";
 // live preview, ratio presets, filters, brand-logo watermark, and a fit mode
 // that pads with a color or blurred backdrop. Exports up to 1080px-wide JPEG
 // (Instagram's feed width) with high-quality resampling; never upscales.
-const RATIOS = [["orig", "Original"], ["1:1", "1:1"], ["4:5", "4:5"], ["1.91:1", "1.91:1"], ["9:16", "9:16"]];
-const RATIO_VAL = { "1:1": 1, "4:5": 4 / 5, "1.91:1": 1.91, "9:16": 9 / 16 };
+const RATIOS = [["orig", "Original"], ["1:1", "1:1"], ["4:5", "4:5"], ["5:4", "5:4"], ["1.91:1", "1.91:1"], ["9:16", "9:16"]];
+const RATIO_VAL = { "1:1": 1, "4:5": 4 / 5, "5:4": 5 / 4, "1.91:1": 1.91, "9:16": 9 / 16 };
 const FILTERS = [
   ["none", "None", ""],
   ["bw", "B&W", "grayscale(1) contrast(1.05)"],
