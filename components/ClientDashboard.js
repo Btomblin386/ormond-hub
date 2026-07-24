@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { SOURCES, VIZZES, fmtValue } from "../lib/metrics";
+import EChart from "./EChart";
 
 // Renders a client analytics dashboard (sections -> widgets) plus a light
 // editor for agency/manager. Clients see the same page read-only.
@@ -17,149 +18,91 @@ async function post(body) {
 /* ---------- SVG charts (dependency-free, hoverable) ---------- */
 const fmtDay = (iso) => new Date(iso + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
-function xy(series, w, h, max, pad = 2) {
-  const m = max || 1;
-  const step = series.length > 1 ? w / (series.length - 1) : w;
-  return series.map((p, i) => [i * step, h - pad - (p.v / m) * (h - pad * 2)]);
-}
-// Catmull-Rom -> bezier for AA-style smooth curves.
-function smoothPath(P) {
-  if (P.length < 2) return "";
-  let d = `M${P[0][0].toFixed(1)},${P[0][1].toFixed(1)}`;
-  for (let i = 0; i < P.length - 1; i++) {
-    const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)];
-    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
-    const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
-    d += `C${c1[0].toFixed(1)},${c1[1].toFixed(1)} ${c2[0].toFixed(1)},${c2[1].toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
-  }
-  return d;
-}
-// Round a raw max up to a "nice" tick ceiling (1/2/2.5/5 × 10^k) so the
-// y-axis reads $20/$40/$60/$80, never $61/$81.
-function niceCeil(v) {
-  if (v <= 0) return 1;
-  const p = Math.pow(10, Math.floor(Math.log10(v)));
-  for (const m of [1, 2, 2.5, 4, 5, 8, 10]) if (v <= m * p) return m * p;
-  return 10 * p;
-}
-// Measure the container's real pixel width so strokes never stretch.
-function useMeasure() {
-  const [el, setEl] = useState(null);
-  const [w, setW] = useState(0);
-  useEffect(() => {
-    if (!el) return;
-    const ro = new ResizeObserver((es) => setW(es[0].contentRect.width));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [el]);
-  return [setEl, w];
-}
+const AREA = { type: "linear", x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: "rgba(99,102,241,.20)" }, { offset: 1, color: "rgba(99,102,241,.01)" }] };
 
 function Spark({ series }) {
-  const [ref, w] = useMeasure();
-  if (!series?.length) return <div ref={ref} className="dw-spark" />;
-  const max = Math.max(...series.map((p) => p.v), 1);
+  if (!series?.length) return null;
   return (
-    <div ref={ref} className="dw-spark">
-      {w > 0 && (
-        <svg width={w} height={26}>
-          <path d={smoothPath(xy(series, w, 26, max, 3))} fill="none" stroke="#6366f1" strokeWidth="1.5" strokeLinecap="round" />
-        </svg>
-      )}
+    <div className="dw-spark">
+      <EChart height={30} option={{
+        animation: false,
+        grid: { left: 2, right: 2, top: 4, bottom: 2 },
+        xAxis: { type: "category", show: false, boundaryGap: false, data: series.map((p) => p.d) },
+        yAxis: { type: "value", show: false },
+        series: [{ type: "line", data: series.map((p) => p.v), smooth: 0.45, showSymbol: false,
+          lineStyle: { color: "#6366f1", width: 1.6 }, areaStyle: { color: AREA } }],
+      }} />
     </div>
   );
 }
 
-// Shared hoverable chart: pixel-accurate, crisp strokes, gradient area fill.
+// Shared chart (ECharts): smooth line + prev-period dashed overlay, or bars.
+// Tooltip shows the date with current + previous-period values.
 function Chart({ series, prevSeries, kind = "line", fmt, h = 110, axes = false }) {
-  const [hov, setHov] = useState(null);
-  const [ref, mw] = useMeasure();
-  const gid = "g" + Math.abs((series?.[0]?.d || "x").split("").reduce((a, c) => a * 31 + c.charCodeAt(0) | 0, h));
-  if (!series?.length) return <div ref={ref} />;
-  const W = Math.max(mw, 60), PADL = axes ? 48 : 0, PADT = 10, PADB = 4, plotW = W - PADL, plotH = h - PADT - PADB;
-  const max = niceCeil(Math.max(...series.map((p) => p.v), ...(prevSeries || []).map((p) => p.v), 1));
-  const Y = (v) => PADT + plotH - (v / max) * plotH;
-  const step = series.length > 1 ? plotW / (series.length - 1) : plotW;
-  const P = series.map((p, i) => [i * step, Y(p.v)]);
-  const PP = prevSeries?.length ? prevSeries.map((p, i) => [i * step, Y(p.v)]) : null;
-  const bw = plotW / series.length;
-  const onMove = (e) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    setHov(Math.max(0, Math.min(series.length - 1, Math.round((e.clientX - r.left - PADL) / plotW * (series.length - 1)))));
+  if (!series?.length) return null;
+  const isBar = kind === "column";
+  const option = {
+    animation: false,
+    grid: { left: axes ? 8 : 2, right: 6, top: 10, bottom: axes ? 4 : 2, containLabel: axes },
+    tooltip: {
+      trigger: "axis", confine: true,
+      backgroundColor: "#1f2430", borderWidth: 0, textStyle: { color: "#fff", fontSize: 12 },
+      formatter: (ps) => {
+        const i = ps[0].dataIndex;
+        let s = `<b>${fmtDay(series[i].d)}</b><br/>` +
+          `<span style="color:#8b93f8">●</span> ${fmtValue(series[i].v, fmt)}`;
+        if (prevSeries?.[i] != null) s += `<br/><span style="color:#9aa1ad">●</span> ${fmtValue(prevSeries[i].v, fmt)} <span style="color:#9aa1ad;font-size:10px">prev period</span>`;
+        return s;
+      },
+    },
+    xAxis: {
+      type: "category", data: series.map((p) => fmtDay(p.d)), show: axes, boundaryGap: isBar,
+      axisLine: { lineStyle: { color: "#e6e8eb" } }, axisTick: { show: false },
+      axisLabel: { color: "#9ca3af", fontSize: 10, hideOverlap: true },
+    },
+    yAxis: {
+      type: "value", show: axes, splitNumber: 4,
+      axisLabel: { color: "#9ca3af", fontSize: 10, formatter: (v) => fmtValue(v, fmt) },
+      splitLine: { lineStyle: { color: "#f0f1f4" } },
+    },
+    series: [
+      prevSeries?.length ? {
+        type: "line", data: prevSeries.map((p) => p.v), smooth: 0.45, showSymbol: false, symbol: "circle", symbolSize: 6,
+        lineStyle: { color: "#cfd4dd", width: 1.5, type: "dashed" }, itemStyle: { color: "#b6bcc7" }, z: 1,
+      } : null,
+      {
+        type: isBar ? "bar" : "line", data: series.map((p) => p.v), smooth: 0.45, showSymbol: false,
+        symbol: "circle", symbolSize: 7,
+        itemStyle: { color: "#6366f1", borderRadius: isBar ? [3, 3, 0, 0] : 0 },
+        lineStyle: { color: "#6366f1", width: 2.2 },
+        areaStyle: isBar ? undefined : { color: AREA },
+        emphasis: { itemStyle: { color: "#6366f1", borderColor: "#fff", borderWidth: 2 } },
+        barMaxWidth: 20, z: 2,
+      },
+    ].filter(Boolean),
   };
-  return (
-    <div className="dw-chartwrap" ref={ref} onMouseLeave={() => setHov(null)}>
-      {mw > 0 && (
-      <svg width={W} height={h} onMouseMove={onMove} style={{ display: "block" }}>
-        <defs>
-          <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#6366f1" stopOpacity="0.18" />
-            <stop offset="100%" stopColor="#6366f1" stopOpacity="0.01" />
-          </linearGradient>
-        </defs>
-        {(axes ? [0.25, 0.5, 0.75, 1] : []).map((g) => (
-          <g key={g}>
-            <line x1={PADL} x2={W} y1={Y(max * g)} y2={Y(max * g)} stroke="#eef0f4" strokeWidth="1" />
-            <text x={PADL - 8} y={Y(max * g) + 3.5} textAnchor="end" className="dw-axis">{fmtValue(max * g, fmt)}</text>
-          </g>
-        ))}
-        <g transform={`translate(${PADL},0)`}>
-          {kind === "column"
-            ? series.map((p, i) => (
-                <rect key={i} x={i * bw + bw * 0.18} y={Y(p.v)} width={Math.max(1, bw * 0.64)} height={Math.max(0, PADT + plotH - Y(p.v))}
-                  rx="1.5" fill="#6366f1" opacity={hov === i ? 1 : 0.8} />
-              ))
-            : (
-              <>
-                <path d={smoothPath(P) + `L${plotW},${PADT + plotH}L0,${PADT + plotH}Z`} fill={`url(#${gid})`} stroke="none" />
-                {PP && <path d={smoothPath(PP)} fill="none" stroke="#cfd4dd" strokeWidth="1.5" strokeDasharray="4 3" />}
-                <path d={smoothPath(P)} fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                {hov != null && <circle cx={P[hov][0]} cy={P[hov][1]} r="4" fill="#fff" stroke="#6366f1" strokeWidth="2" />}
-                {hov != null && PP && <circle cx={PP[hov][0]} cy={PP[hov][1]} r="3" fill="#fff" stroke="#b6bcc7" strokeWidth="1.5" />}
-              </>
-            )}
-          {hov != null && <line x1={P[hov][0]} x2={P[hov][0]} y1={PADT} y2={PADT + plotH} stroke="#c7d2fe" strokeWidth="1" />}
-        </g>
-      </svg>
-      )}
-      {axes && (
-        <div className="dw-xlabels" style={{ paddingLeft: PADL }}>
-          <span>{fmtDay(series[0].d)}</span>
-          <span>{fmtDay(series[Math.floor(series.length / 2)].d)}</span>
-          <span>{fmtDay(series[series.length - 1].d)}</span>
-        </div>
-      )}
-      {hov != null && mw > 0 && (
-        <div className="dw-tip" style={{ left: Math.min(Math.max(P[hov][0] + PADL, 60), W - 60) }}>
-          <div className="dw-tip-date">{fmtDay(series[hov].d)}</div>
-          <div><span className="dw-dot" style={{ background: "#6366f1" }} /> {fmtValue(series[hov].v, fmt)}</div>
-          {prevSeries?.[hov] && <div className="dw-tip-prev"><span className="dw-dot" style={{ background: "#c3c8d2" }} /> {fmtValue(prevSeries[hov].v, fmt)} <span>prev</span></div>}
-        </div>
-      )}
-    </div>
-  );
+  return <EChart option={option} height={h} />;
 }
 const LineChart = (p) => <Chart {...p} kind="line" />;
 const Bars = (p) => <Chart {...p} kind="column" />;
 function Donut({ cats, total, fmt }) {
   const sum = cats.reduce((a, c) => a + c.value, 0) || 1;
-  const C = 2 * Math.PI * 40;
-  let acc = 0;
   return (
     <div className="dw-donut">
-      <svg viewBox="0 0 100 100" className="dw-donut-svg">
-        <circle cx="50" cy="50" r="40" fill="none" stroke="#eef0f4" strokeWidth="14" />
-        {cats.map((c, i) => {
-          const frac = c.value / sum;
-          const el = (
-            <circle key={i} cx="50" cy="50" r="40" fill="none" stroke={PALETTE[i % PALETTE.length]} strokeWidth="14"
-              strokeDasharray={`${frac * C} ${C}`} strokeDashoffset={-acc * C} transform="rotate(-90 50 50)" />
-          );
-          acc += frac;
-          return el;
-        })}
-        <text x="50" y="54" textAnchor="middle" className="dw-donut-total">{fmtValue(total, fmt)}</text>
-      </svg>
+      <div className="dw-donut-svg">
+        <EChart height={130} option={{
+          animation: false,
+          title: { text: fmtValue(total, fmt), left: "center", top: "middle", textStyle: { fontSize: 14, fontWeight: 700, color: "#111827" } },
+          tooltip: {
+            confine: true, backgroundColor: "#1f2430", borderWidth: 0, textStyle: { color: "#fff", fontSize: 12 },
+            formatter: (p) => `<b>${p.name}</b><br/>${fmtValue(p.value, fmt)} · ${((p.value / sum) * 100).toFixed(1)}%`,
+          },
+          series: [{ type: "pie", radius: ["64%", "90%"], avoidLabelOverlap: true, label: { show: false },
+            itemStyle: { borderColor: "#fff", borderWidth: 2 },
+            color: PALETTE,
+            data: cats.map((c) => ({ name: c.label, value: c.value })) }],
+        }} />
+      </div>
       <div className="dw-legend">
         {cats.map((c, i) => (
           <div key={i} className="dw-legend-row">
