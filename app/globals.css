@@ -384,6 +384,22 @@ td a.rowlink { color: #4338ca; font-weight: 600; }
 .file-btn:hover { background: #f5f7ff; border-color: #c7d2fe; }
 .file-btn.disabled { opacity: .55; cursor: default; pointer-events: none; }
 .cmp-thumb-col { display: flex; flex-direction: column; gap: 5px; align-items: center; }
+.cmp-thumb-col[draggable="true"] { cursor: grab; }
+.cmp-thumb-col.dragging { opacity: .4; }
+.thumb-pos { position: absolute; bottom: 3px; left: 3px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: rgba(17,24,39,.78); color: #fff; font-size: 10px; font-weight: 600; line-height: 16px; text-align: center; pointer-events: none; }
+.thumb-ord { display: flex; gap: 4px; }
+.thumb-ord button { border: 1px solid #d1d5db; background: #fff; color: #374151; font-size: 10px; line-height: 1; padding: 3px 8px; border-radius: 6px; cursor: pointer; transition: background .12s, border-color .12s; }
+.thumb-ord button:hover:not(:disabled) { background: #f5f7ff; border-color: #c7d2fe; }
+.thumb-ord button:disabled { opacity: .35; cursor: default; }
+
+/* Universal 12-hour date/time picker (replaces native datetime-local, which
+   renders military time on machines whose OS clock is set to 24-hour). */
+.when-picker { display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.when-picker input[type="date"], .when-picker select { border: 1px solid #d1d5db; border-radius: 8px; padding: 7px 8px; font: inherit; font-size: 13px; background: #fff; color: #111827; }
+.when-picker select { cursor: pointer; }
+.when-colon { color: #6b7280; font-weight: 600; }
+.when-clear { width: 22px; height: 22px; border-radius: 999px; border: 1px solid #d1d5db; background: #fff; color: #6b7280; font-size: 13px; line-height: 1; cursor: pointer; }
+.when-clear:hover { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
 .studio-edit-btn { display: inline-flex; align-items: center; gap: 5px; border: 1px solid #d1d5db; background: #fff; color: #4338ca; font-size: 11px; font-weight: 500; padding: 4px 9px; border-radius: 7px; cursor: pointer; transition: background .12s, border-color .12s; }
 .studio-edit-btn:hover { background: #eef2ff; border-color: #a5b4fc; }
 .cmp-add { display: inline-flex; align-items: center; gap: 6px; border: 1px dashed #cbd5e1; background: #fff; color: #4338ca; font-size: 12.5px; font-weight: 500; padding: 8px 12px; border-radius: 8px; cursor: pointer; margin: 0 8px 14px 0; transition: background .12s, border-color .12s; }

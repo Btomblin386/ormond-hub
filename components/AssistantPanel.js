@@ -2,8 +2,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import WhenPicker from "./WhenPicker";
 
 const STATUS_CHIP = { queued: "Queued", running: "Running…", done: "Done", failed: "Failed", pending: "Pending" };
+
+// en-US 12-hour so every viewer sees AM/PM + month names regardless of OS locale.
+const fmtWhen = (v) => (v ? new Date(v).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true }) : "");
 
 async function post(body) {
   const r = await fetch("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -76,7 +80,7 @@ export default function AssistantPanel({ clientId, client, tasks, agency }) {
                 <div className="task-head">
                   <span className={"cbadge " + (t.status === "done" ? "published" : t.status === "failed" ? "failed" : t.status === "running" ? "publishing" : "draft")}>{STATUS_CHIP[t.status] || t.status}</span>
                   <span className="task-title">{t.title}</span>
-                  <span className="content-when">{new Date(t.completed_at || t.created_at).toLocaleString()}</span>
+                  <span className="content-when">{fmtWhen(t.completed_at || t.created_at)}</span>
                 </div>
                 {t.result && <div className="task-result">{t.result}</div>}
                 {t.error && <div className="push-err">{t.error}</div>}
@@ -91,7 +95,7 @@ export default function AssistantPanel({ clientId, client, tasks, agency }) {
                     {t.proposal.state === "pending" && (
                       <ul className="prop-details">
                         {(t.proposal.details || []).slice(0, 8).map((d) => (
-                          <li key={d.id}>{d.client ? <b>{d.client} · </b> : null}{d.status} · {d.scheduled_at ? new Date(d.scheduled_at).toLocaleDateString() : "no date"} — {d.caption}</li>
+                          <li key={d.id}>{d.client ? <b>{d.client} · </b> : null}{d.status} · {d.scheduled_at ? new Date(d.scheduled_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "no date"} — {d.caption}</li>
                         ))}
                         {(t.proposal.details || []).length > 8 && <li>…and {(t.proposal.details || []).length - 8} more</li>}
                       </ul>
@@ -125,7 +129,7 @@ export default function AssistantPanel({ clientId, client, tasks, agency }) {
         <p className="note">Dated notes about this brand — they surface in agency Notifications when due. The assistant can also set these for you.</p>
         <div className="set-row">
           <input type="text" value={remTitle} onChange={(e) => setRemTitle(e.target.value)} placeholder="e.g. Post fantasy-league picks link" style={{ flex: 2 }} />
-          <input type="datetime-local" value={remDate} onChange={(e) => setRemDate(e.target.value)} style={{ flex: 1, minWidth: 190, border: "1px solid #d1d5db", borderRadius: 8, padding: "7px 10px", font: "inherit", fontSize: 13 }} />
+          <WhenPicker value={remDate} onChange={setRemDate} clearable={false} />
           <button className="social-btn" onClick={addReminder} disabled={busy === "rem"}>Add</button>
         </div>
         {reminders.length === 0
@@ -134,7 +138,7 @@ export default function AssistantPanel({ clientId, client, tasks, agency }) {
             <div key={t.id} className="set-conn">
               <span>⏰</span>
               <span className="set-conn-name">{t.title}</span>
-              <span className="muted" style={{ fontSize: 12 }}>{t.due_at ? new Date(t.due_at).toLocaleString() : ""}</span>
+              <span className="muted" style={{ fontSize: 12 }}>{fmtWhen(t.due_at)}</span>
               <button className="rule-del" disabled={busy === t.id + "dismiss"} onClick={() => act(t.id, "dismiss")}>Done</button>
             </div>
           ))}

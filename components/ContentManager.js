@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { fileToB64, uploadImage, uploadVideoSigned, imageSize, IG_FEED_MIN, IG_FEED_MAX, videoMeta, validateReel } from "../lib/media";
 import DropboxPicker from "./DropboxPicker";
 import ImageEditor from "./ImageEditor";
+import WhenPicker from "./WhenPicker";
 
 /* --------- Text formatting (Instagram/Facebook show no markdown, so bold and
    italic are done with Unicode math alphabet characters that survive posting). */
@@ -247,6 +248,11 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
   const [scheduledAt, setScheduledAt] = useState(seedDate || (editItem?.scheduled_at ? toLocalInput(editItem.scheduled_at) : nowPlus30()));
   const [activeTab, setActiveTab] = useState(selChans[0] || "facebook");
   const [editorIdx, setEditorIdx] = useState(null);
+  const [dragIdx, setDragIdx] = useState(null); // thumbnail being drag-reordered
+  const moveMedia = (from, to) => setMedia((m) => {
+    if (to < 0 || to >= m.length || from === to) return m;
+    const a = [...m]; const [x] = a.splice(from, 1); a.splice(to, 0, x); return a;
+  });
   const [progress, setProgress] = useState({});
   const [igWarn, setIgWarn] = useState("");
   const [videoWarn, setVideoWarn] = useState("");
@@ -465,7 +471,7 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
     // Approving/scheduling a post whose time already passed would publish it within
     // minutes with no heads-up — prompt to post now or go back and pick a new time.
     if (!postNow && (status === "approved" || status === "scheduled") && scheduledAt && new Date(scheduledAt).getTime() < Date.now()) {
-      const when = new Date(scheduledAt).toLocaleString();
+      const when = fmt12(scheduledAt);
       const ok = window.confirm(`The scheduled time (${when}) has already passed.\n\nOK — publish it now.\nCancel — go back and pick a new time.`);
       if (!ok) { flash("Pick a future time above, then approve again."); return; }
       postNow = true;
@@ -647,9 +653,9 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
         </div>
       ) : (
         <div className={"cmp-field cmp-dropzone" + (dragOver ? " over" : "")}
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragOver={(e) => { if (dragIdx !== null) return; e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => { e.preventDefault(); setDragOver(false); uploadFiles([...e.dataTransfer.files]); }}>
+          onDrop={(e) => { if (dragIdx !== null) { setDragIdx(null); return; } e.preventDefault(); setDragOver(false); uploadFiles([...e.dataTransfer.files]); }}>
           <div className="cmp-label-row">
             <label>Images {igActive && <span className="muted">· 1 for a Story, up to 10 for a carousel · or drag &amp; drop here</span>}</label>
           </div>
@@ -666,17 +672,32 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
           ))}
           {igWarn && <div className="cmp-warn">⚠ {igWarn}</div>}
           {media.length > 0 && (
-            <div className="cmp-thumbs">
-              {media.map((u, j) => (
-                <div key={j} className="cmp-thumb-col">
-                  <div className="cmp-thumb">
-                    <img src={u} alt="" />
-                    <button type="button" onClick={() => setMedia((m) => m.filter((_, i) => i !== j))}>×</button>
+            <>
+              <div className="cmp-thumbs">
+                {media.map((u, j) => (
+                  <div key={u + j} className={"cmp-thumb-col" + (dragIdx === j ? " dragging" : "")}
+                    draggable={media.length > 1}
+                    onDragStart={(e) => { setDragIdx(j); e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/x-reorder", String(j)); } catch {} }}
+                    onDragEnd={() => setDragIdx(null)}
+                    onDragOver={(e) => { if (dragIdx === null) return; e.preventDefault(); e.stopPropagation(); }}
+                    onDrop={(e) => { if (dragIdx === null) return; e.preventDefault(); e.stopPropagation(); moveMedia(dragIdx, j); setDragIdx(null); }}>
+                    <div className="cmp-thumb">
+                      <img src={u} alt="" draggable={false} />
+                      {media.length > 1 && <span className="thumb-pos">{j + 1}</span>}
+                      <button type="button" onClick={() => setMedia((m) => m.filter((_, i) => i !== j))}>×</button>
+                    </div>
+                    {media.length > 1 && (
+                      <div className="thumb-ord">
+                        <button type="button" title="Move earlier" disabled={j === 0} onClick={() => moveMedia(j, j - 1)}>◀</button>
+                        <button type="button" title="Move later" disabled={j === media.length - 1} onClick={() => moveMedia(j, j + 1)}>▶</button>
+                      </div>
+                    )}
+                    <button type="button" className="studio-edit-btn" onClick={() => setEditorIdx(j)}>✎ Edit in Studio</button>
                   </div>
-                  <button type="button" className="studio-edit-btn" onClick={() => setEditorIdx(j)}>✎ Edit in Studio</button>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+              {media.length > 1 && <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>Drag a photo (or use ◀ ▶) to reorder — <b>#1 leads the carousel</b>.</div>}
+            </>
           )}
           {editorIdx !== null && media[editorIdx] && (
             <ImageEditor src={media[editorIdx]} brandLogo={brandLogo}
@@ -771,7 +792,7 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
 
       <div className="cmp-field">
         <label>Schedule for</label>
-        <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
+        <WhenPicker value={scheduledAt} onChange={setScheduledAt} />
         {scheduledAt
           ? <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>📅 {fmt12(scheduledAt)}</div>
           : <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>Leave blank to publish as soon as it&apos;s approved.</div>}
@@ -964,7 +985,7 @@ export default function ContentManager({ clientId, client, items, socials, tikto
     if (status === "approved") {
       const it = items.find((x) => x.id === id);
       if (it?.scheduled_at && new Date(it.scheduled_at).getTime() < Date.now()) {
-        const ok = window.confirm(`This post's scheduled time (${new Date(it.scheduled_at).toLocaleString()}) has already passed — approving publishes it within a few minutes.\n\nOK — approve & publish shortly.\nCancel — open it to pick a new time.`);
+        const ok = window.confirm(`This post's scheduled time (${fmt12(it.scheduled_at)}) has already passed — approving publishes it within a few minutes.\n\nOK — approve & publish shortly.\nCancel — open it to pick a new time.`);
         if (!ok) { startEdit(it); return; }
       }
     }

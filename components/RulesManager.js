@@ -119,7 +119,7 @@ export default function RulesManager({ accountId, rules, events }) {
               {!r.enabled && <span className="rule-tag off">paused</span>}
             </div>
             <div className="rule-desc">{describe(r)}</div>
-            {r.last_triggered_at && <div className="rule-when">Last triggered {new Date(r.last_triggered_at).toLocaleString()}</div>}
+            {r.last_triggered_at && <div className="rule-when">Last triggered {new Date(r.last_triggered_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true })}</div>}
           </div>
           <div className="rule-actions">
             <button onClick={async () => { setBusy(r.id); await post({ op: "toggle", id: r.id, enabled: !r.enabled }); setBusy(""); }} disabled={busy === r.id}>
@@ -139,7 +139,7 @@ export default function RulesManager({ accountId, rules, events }) {
             <div key={e.id} className={"rule-event" + (e.acknowledged ? " ack" : "")}>
               <span className={"log-status " + (e.action_taken === "paused" ? "ok" : "pending")}>{e.action_taken}</span>
               <span className="rule-event-msg">{e.message}</span>
-              <span className="log-when">{new Date(e.created_at).toLocaleString()}</span>
+              <span className="log-when">{new Date(e.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true })}</span>
               {!e.acknowledged && (
                 <button className="rule-ack" onClick={async () => { await post({ op: "ack", id: e.id }); }}>Dismiss</button>
               )}

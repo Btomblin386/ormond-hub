@@ -139,7 +139,7 @@ export default function AdsManager({ accountId, accountExt, cap, urlParams, camp
               <span className="log-action">{w.action.replace(/_/g, " ")}</span>
               <span className="log-target">{w.target_type || ""} {w.target_id ? "#" + String(w.target_id).slice(-6) : ""}</span>
               <span className={"log-status " + w.status}>{w.status}</span>
-              <span className="log-when">{new Date(w.created_at).toLocaleString()}</span>
+              <span className="log-when">{new Date(w.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true })}</span>
             </div>
           ))}
         </div>

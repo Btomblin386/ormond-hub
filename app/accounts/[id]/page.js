@@ -120,7 +120,7 @@ export default async function AccountDetail({ params, searchParams }) {
         <div id="insights" className="panel">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
             <h2>Smart Insights</h2>
-            {insightsAt && <span className="note" style={{ margin: 0 }}>Updated {new Date(insightsAt).toLocaleDateString()}</span>}
+            {insightsAt && <span className="note" style={{ margin: 0 }}>Updated {new Date(insightsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>}
           </div>
           <p className="note">AI-flagged from monthly sales trends (month-over-month + year-over-year), judged against the business seasonality. Pin any card to track it.</p>
           {GROUPS.map((g) => {

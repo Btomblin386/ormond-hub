@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import WhenPicker, { TimePicker } from "./WhenPicker";
 
 const STATUS_LABEL = {
   draft: "Draft", needs_approval: "Needs approval", needs_revisions: "Needs revisions", approved: "Approved",
@@ -33,7 +34,7 @@ function toLocalInput(iso) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 function fmtDay(key) {
-  return new Date(key + "T00:00:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  return new Date(key + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 }
 
 export default function ContentCalendar({ items, notes = [], teamMembers = [], clientId, onCreateOnDate, title, showClient }) {
@@ -162,7 +163,7 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
     } finally { setBusy(""); }
   }
 
-  const monthName = cursor.toLocaleString(undefined, { month: "long", year: "numeric" });
+  const monthName = cursor.toLocaleString("en-US", { month: "long", year: "numeric" });
   const todayKey = keyOf(new Date());
 
   return (
@@ -276,7 +277,7 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
                   <option value="">No assignee</option>
                   {teamMembers.map((m) => <option key={m} value={m}>{m}</option>)}
                 </select>
-                <input type="time" value={noteForm.time} onChange={(e) => setNoteForm((f) => ({ ...f, time: e.target.value }))} />
+                <TimePicker value={noteForm.time} onChange={(t) => setNoteForm((f) => ({ ...f, time: t }))} />
                 <button className="cal-approve" disabled={busy === "note" || !noteForm.title.trim()} onClick={saveNote}>{busy === "note" ? "Saving…" : "Save note"}</button>
               </div>
               <div className="muted" style={{ fontSize: 11 }}>Notes surface in agency Notifications when due.</div>
@@ -328,7 +329,7 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
           <div className="cal-modal-inner day-modal" onClick={(e) => e.stopPropagation()}>
             <button className="cal-x day-x" onClick={() => setSelNote(null)}>×</button>
             <h3 className="day-title">📝 Note</h3>
-            <div className="day-sub">{selNote.due_at ? new Date(selNote.due_at).toLocaleString() : ""}{showClient && selNote.client ? ` · ${selNote.client}` : ""}</div>
+            <div className="day-sub">{selNote.due_at ? fmtWhen(selNote.due_at) : ""}{showClient && selNote.client ? ` · ${selNote.client}` : ""}</div>
             <div className="note-body">{selNote.title}</div>
             <div className="note-meta">
               {selNote.created_by && <span>Added by <b>{selNote.created_by}</b></span>}
@@ -368,7 +369,7 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
               <div className="cal-quick">
                 <label>Scheduled time</label>
                 <div className="cal-time-row">
-                  <input type="datetime-local" value={qWhen} onChange={(e) => setQWhen(e.target.value)} />
+                  <WhenPicker value={qWhen} onChange={setQWhen} />
                   <button className="social-btn" disabled={busy === "q" || qWhen === (sel.scheduled_at ? toLocalInput(sel.scheduled_at) : "")} onClick={saveQuickTime}>Update time</button>
                 </div>
                 {qWhen && <div className="muted" style={{ fontSize: 11, marginBottom: 6 }}>📅 {fmtWhen(qWhen)}</div>}
