@@ -1039,3 +1039,22 @@ video.mention-media { max-width: 240px; border-radius: 8px; }
 .dwm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
 .dwm-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #4b5563; }
 .dwm-grid input, .dwm-grid select { border: 1px solid #d1d5db; border-radius: 8px; padding: 7px 9px; font: inherit; font-size: 13px; background: #fff; }
+
+/* ---------- Dashboard interactivity (hover + drill-down) ---------- */
+.dw.clickable { cursor: pointer; transition: box-shadow .12s, border-color .12s; }
+.dw.clickable:hover { border-color: #c7d2fe; box-shadow: 0 3px 10px rgba(99,102,241,.12); }
+.dw-chartwrap { position: relative; }
+.dw-axis { font-size: 8px; fill: #9ca3af; }
+.dw-xlabels { display: flex; justify-content: space-between; font-size: 10.5px; color: #9ca3af; margin-top: 2px; }
+.dw-tip { position: absolute; top: 0; transform: translateX(-50%); background: #1f2430; color: #fff; border-radius: 8px; padding: 7px 10px; font-size: 11.5px; line-height: 1.5; pointer-events: none; white-space: nowrap; box-shadow: 0 6px 16px rgba(0,0,0,.25); z-index: 5; }
+.dw-tip-date { font-weight: 700; margin-bottom: 2px; }
+.dw-tip-prev { color: #b9c0cc; } .dw-tip-prev span { font-size: 10px; }
+.dw-tip .dw-dot { display: inline-block; margin-right: 4px; }
+.dw-statsrow { display: flex; gap: 26px; flex-wrap: wrap; margin-top: 12px; font-size: 12.5px; }
+.dw-statsrow > div { display: flex; flex-direction: column; gap: 2px; }
+.dw-statsrow b { font-size: 14px; }
+.dw-bd-row { display: flex; align-items: center; gap: 10px; padding: 5px 0; font-size: 12px; }
+.dw-bd-lbl { width: 190px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #374151; }
+.dw-bd-bar { flex: 1; height: 8px; background: #f0f1f4; border-radius: 999px; overflow: hidden; }
+.dw-bd-bar span { display: block; height: 100%; background: #6366f1; border-radius: 999px; }
+.dw-bd-row b { width: 84px; text-align: right; }

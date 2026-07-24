@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { SOURCES, VIZZES, fmtValue } from "../lib/metrics";
@@ -14,43 +14,97 @@ async function post(body) {
   return r.json();
 }
 
-/* ---------- tiny SVG charts (dependency-free) ---------- */
-function pts(series, w, h, max) {
-  const m = max || Math.max(...series.map((p) => p.v), 1);
+/* ---------- SVG charts (dependency-free, hoverable) ---------- */
+const fmtDay = (iso) => new Date(iso + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+
+function xy(series, w, h, max, pad = 2) {
+  const m = max || 1;
   const step = series.length > 1 ? w / (series.length - 1) : w;
-  return series.map((p, i) => `${(i * step).toFixed(1)},${(h - (p.v / m) * (h - 3) - 1).toFixed(1)}`).join(" ");
+  return series.map((p, i) => [i * step, h - pad - (p.v / m) * (h - pad * 2)]);
+}
+// Catmull-Rom -> bezier for AA-style smooth curves.
+function smoothPath(P) {
+  if (P.length < 2) return "";
+  let d = `M${P[0][0].toFixed(1)},${P[0][1].toFixed(1)}`;
+  for (let i = 0; i < P.length - 1; i++) {
+    const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)];
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+    const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    d += `C${c1[0].toFixed(1)},${c1[1].toFixed(1)} ${c2[0].toFixed(1)},${c2[1].toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+  }
+  return d;
 }
 function Spark({ series }) {
   if (!series?.length) return null;
+  const max = Math.max(...series.map((p) => p.v), 1);
   return (
     <svg className="dw-spark" viewBox="0 0 96 26" preserveAspectRatio="none">
-      <polyline points={pts(series, 96, 26)} fill="none" stroke="#6366f1" strokeWidth="1.6" />
+      <path d={smoothPath(xy(series, 96, 26, max))} fill="none" stroke="#6366f1" strokeWidth="1.6" />
     </svg>
   );
 }
-function LineChart({ series, prevSeries }) {
+
+// Shared hoverable chart: line or bars, optional prev-period overlay + axes.
+function Chart({ series, prevSeries, kind = "line", fmt, h = 110, axes = false }) {
+  const [hov, setHov] = useState(null); // index
   if (!series?.length) return null;
+  const W = 320, PADL = axes ? 40 : 0, plotW = W - PADL;
   const max = Math.max(...series.map((p) => p.v), ...(prevSeries || []).map((p) => p.v), 1);
+  const P = xy(series, plotW, h, max);
+  const PP = prevSeries?.length ? xy(prevSeries, plotW, h, max) : null;
+  const bw = plotW / series.length;
+  const onMove = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const fx = (e.clientX - r.left) / r.width * W - PADL;
+    setHov(Math.max(0, Math.min(series.length - 1, Math.round(fx / plotW * (series.length - 1)))));
+  };
+  const grid = axes ? [0.25, 0.5, 0.75, 1] : [];
   return (
-    <svg className="dw-chart" viewBox="0 0 320 110" preserveAspectRatio="none">
-      {prevSeries?.length > 0 && <polyline points={pts(prevSeries, 320, 110, max)} fill="none" stroke="#d7dbe3" strokeWidth="1.5" strokeDasharray="4 3" />}
-      <polyline points={pts(series, 320, 110, max)} fill="none" stroke="#6366f1" strokeWidth="2" />
-    </svg>
+    <div className="dw-chartwrap" onMouseLeave={() => setHov(null)}>
+      <svg className="dw-chart" style={{ height: h }} viewBox={`0 0 ${W} ${h}`} preserveAspectRatio="none" onMouseMove={onMove}>
+        {grid.map((g) => (
+          <g key={g}>
+            <line x1={PADL} x2={W} y1={h - 2 - g * (h - 4)} y2={h - 2 - g * (h - 4)} stroke="#eef0f4" strokeWidth="1" />
+            <text x={PADL - 4} y={h - 2 - g * (h - 4) + 3} textAnchor="end" className="dw-axis">{fmtValue(max * g, fmt)}</text>
+          </g>
+        ))}
+        <g transform={`translate(${PADL},0)`}>
+          {kind === "column"
+            ? series.map((p, i) => {
+                const bh = (p.v / max) * (h - 6);
+                return <rect key={i} x={i * bw + bw * 0.18} y={h - 2 - bh} width={bw * 0.64} height={bh} rx="1.5"
+                  fill="#6366f1" opacity={hov === i ? 1 : 0.8} />;
+              })
+            : (
+              <>
+                {PP && <path d={smoothPath(PP)} fill="none" stroke="#d7dbe3" strokeWidth="1.5" strokeDasharray="4 3" />}
+                <path d={smoothPath(P)} fill="none" stroke="#6366f1" strokeWidth="2" />
+                {hov != null && <circle cx={P[hov][0]} cy={P[hov][1]} r="3.5" fill="#6366f1" />}
+                {hov != null && PP && <circle cx={PP[hov][0]} cy={PP[hov][1]} r="3" fill="#b6bcc7" />}
+              </>
+            )}
+          {hov != null && <line x1={P[hov][0]} x2={P[hov][0]} y1="0" y2={h} stroke="#c7d2fe" strokeWidth="1" />}
+        </g>
+      </svg>
+      {axes && (
+        <div className="dw-xlabels">
+          <span>{fmtDay(series[0].d)}</span>
+          <span>{fmtDay(series[Math.floor(series.length / 2)].d)}</span>
+          <span>{fmtDay(series[series.length - 1].d)}</span>
+        </div>
+      )}
+      {hov != null && (
+        <div className="dw-tip" style={{ left: `${((P[hov][0] + PADL) / W) * 100}%` }}>
+          <div className="dw-tip-date">{fmtDay(series[hov].d)}</div>
+          <div><span className="dw-dot" style={{ background: "#6366f1" }} /> {fmtValue(series[hov].v, fmt)}</div>
+          {prevSeries?.[hov] && <div className="dw-tip-prev"><span className="dw-dot" style={{ background: "#c3c8d2" }} /> {fmtValue(prevSeries[hov].v, fmt)} <span>prev</span></div>}
+        </div>
+      )}
+    </div>
   );
 }
-function Bars({ series }) {
-  if (!series?.length) return null;
-  const max = Math.max(...series.map((p) => p.v), 1);
-  const bw = 320 / series.length;
-  return (
-    <svg className="dw-chart" viewBox="0 0 320 110" preserveAspectRatio="none">
-      {series.map((p, i) => {
-        const h = (p.v / max) * 104;
-        return <rect key={i} x={i * bw + bw * 0.15} y={110 - h} width={bw * 0.7} height={h} rx="1.5" fill="#6366f1" opacity="0.85" />;
-      })}
-    </svg>
-  );
-}
+const LineChart = (p) => <Chart {...p} kind="line" />;
+const Bars = (p) => <Chart {...p} kind="column" />;
 function Donut({ cats, total, fmt }) {
   const sum = cats.reduce((a, c) => a + c.value, 0) || 1;
   const C = 2 * Math.PI * 40;
@@ -94,15 +148,17 @@ function Delta({ delta, dir }) {
   );
 }
 
-function Widget({ d, editMode, onEdit, onMove, onDelete }) {
+function Widget({ d, editMode, onEdit, onMove, onDelete, onOpen }) {
+  const drillable = !editMode && d.viz !== "table" && onOpen;
   return (
-    <div className={"dw" + (d.w === 2 ? " w2" : "")}>
+    <div className={"dw" + (d.w === 2 ? " w2" : "") + (drillable ? " clickable" : "")}
+      onClick={drillable ? onOpen : undefined} title={drillable ? "Click for the full breakdown" : undefined}>
       <div className="dw-head">
         <span className="dw-icon" title={d.sourceLabel}>{d.icon}</span>
         <span className="dw-title">{d.title}</span>
         {d.overridden && <span className="dw-range">({d.days}d)</span>}
         {editMode && (
-          <span className="dw-tools">
+          <span className="dw-tools" onClick={(e) => e.stopPropagation()}>
             <button title="Edit" onClick={onEdit}>✎</button>
             <button title="Move earlier" onClick={() => onMove(-1)}>↑</button>
             <button title="Move later" onClick={() => onMove(1)}>↓</button>
@@ -119,7 +175,7 @@ function Widget({ d, editMode, onEdit, onMove, onDelete }) {
       {(d.viz === "line" || d.viz === "column") && (
         <>
           <div className="dw-value sm">{fmtValue(d.total, d.fmt)} <Delta delta={d.delta} dir={d.dir} /></div>
-          {d.viz === "line" ? <LineChart series={d.series} prevSeries={d.prevSeries} /> : <Bars series={d.series} />}
+          {d.viz === "line" ? <LineChart series={d.series} prevSeries={d.prevSeries} fmt={d.fmt} /> : <Bars series={d.series} fmt={d.fmt} />}
         </>
       )}
       {d.viz === "donut" && (d.cats?.length ? <Donut cats={d.cats} total={d.total} fmt={d.fmt} /> : <div className="dw-empty">No data in this period.</div>)}
@@ -141,6 +197,71 @@ function Widget({ d, editMode, onEdit, onMove, onDelete }) {
           </table>
         ) : <div className="dw-empty">No campaign spend in this period.</div>
       )}
+    </div>
+  );
+}
+
+/* ---------- metric drill-down modal ---------- */
+function MetricModal({ clientId, widget, onClose }) {
+  const [days, setDays] = useState(widget.days || 30);
+  const [kind, setKind] = useState(widget.viz === "column" ? "column" : "line");
+  const [res, setRes] = useState(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let dead = false;
+    setLoading(true);
+    fetch("/api/metric", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId, source: widget.source, metricKey: widget.metric_key, days }) })
+      .then((r) => r.json()).catch(() => null)
+      .then((d) => { if (!dead) { setRes(d?.data ? d : null); setLoading(false); } });
+    return () => { dead = true; };
+  }, [days, clientId, widget.source, widget.metric_key]);
+  const d = res?.data;
+  const bd = res?.breakdown;
+  const bdMax = bd?.length ? Math.max(...bd.map((b) => b.value), 1) : 1;
+  const avg = d?.series?.length ? d.total / d.series.filter((p) => p.v).length : null;
+  const best = d?.series?.length ? d.series.reduce((a, p) => (p.v > a.v ? p : a), d.series[0]) : null;
+  return (
+    <div className="cal-modal" onClick={onClose}>
+      <div className="cal-modal-inner wide" onClick={(e) => e.stopPropagation()}>
+        <div className="cal-modal-top">
+          <span className="dw-icon">{widget.icon}</span>
+          <b style={{ fontSize: 15 }}>{widget.title}</b>
+          <span className="muted" style={{ fontSize: 12 }}>{widget.sourceLabel}</span>
+          <button className="cal-x" onClick={onClose}>×</button>
+        </div>
+        <div className="dashx-ranges" style={{ margin: "10px 0" }}>
+          {[7, 30, 60, 90, 180, 365].map((r) => (
+            <button key={r} className={"pv-tab" + (days === r ? " on" : "")} onClick={() => setDays(r)}>Last {r}d</button>
+          ))}
+          <span style={{ flex: 1 }} />
+          <button className={"pv-tab" + (kind === "line" ? " on" : "")} onClick={() => setKind("line")}>Line</button>
+          <button className={"pv-tab" + (kind === "column" ? " on" : "")} onClick={() => setKind("column")}>Columns</button>
+        </div>
+        {loading || !d ? <div className="muted" style={{ fontSize: 13, padding: 30 }}>{loading ? "Loading…" : "No data."}</div> : (
+          <>
+            <div className="dw-value" style={{ fontSize: 28 }}>{fmtValue(d.total, d.fmt)} <Delta delta={d.delta} dir={d.dir} /></div>
+            <div className="muted" style={{ fontSize: 11.5, margin: "2px 0 8px" }}>vs {fmtValue(d.prev, d.fmt)} the previous {days} days · dashed line = previous period</div>
+            <Chart series={d.series} prevSeries={d.prevSeries} kind={kind} fmt={d.fmt} h={220} axes />
+            <div className="dw-statsrow">
+              <div><span className="muted">Daily avg</span><b>{fmtValue(avg, d.fmt)}</b></div>
+              <div><span className="muted">Best day</span><b>{best ? `${fmtValue(best.v, d.fmt)} · ${fmtDay(best.d)}` : "—"}</b></div>
+              <div><span className="muted">Previous period</span><b>{fmtValue(d.prev, d.fmt)}</b></div>
+            </div>
+            {bd?.length > 0 && (
+              <div className="dw-bd">
+                <div className="dash-sec-head" style={{ marginTop: 14 }}>By campaign</div>
+                {bd.map((b, i) => (
+                  <div key={i} className="dw-bd-row">
+                    <span className="dw-bd-lbl" title={b.label}>{b.label}</span>
+                    <span className="dw-bd-bar"><span style={{ width: `${(b.value / bdMax) * 100}%` }} /></span>
+                    <b>{fmtValue(b.value, d.fmt)}</b>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -234,10 +355,11 @@ function WidgetModal({ dashboardId, sections, widget, onClose }) {
   );
 }
 
-export default function ClientDashboard({ accountId, dashboardId, sections, days, ranges, canEdit }) {
+export default function ClientDashboard({ accountId, clientId, dashboardId, sections, days, ranges, canEdit }) {
   const router = useRouter();
   const [editMode, setEditMode] = useState(false);
   const [modal, setModal] = useState(null); // "new" | widget-data object
+  const [drill, setDrill] = useState(null); // widget-data object -> full breakdown
   const sectionNames = sections.map((s) => s.title).filter(Boolean);
 
   async function move(id, dir) { await post({ op: "move_widget", id, dir }); router.refresh(); }
@@ -276,11 +398,14 @@ export default function ClientDashboard({ accountId, dashboardId, sections, days
               <Widget key={d.id} d={d} editMode={editMode}
                 onEdit={() => setModal(d)}
                 onMove={(dir) => move(d.id, dir)}
-                onDelete={() => del(d.id)} />
+                onDelete={() => del(d.id)}
+                onOpen={() => setDrill(d.metric_key === "spend_by_campaign" ? { ...d, metric_key: "spend", title: "Ad Spend" } : d)} />
             ))}
           </div>
         </div>
       ))}
+
+      {drill && <MetricModal clientId={clientId} widget={drill} onClose={() => setDrill(null)} />}
 
       {modal && (
         <WidgetModal dashboardId={dashboardId} sections={sectionNames} onClose={() => setModal(null)}

@@ -81,7 +81,7 @@ export async function middleware(req) {
   // no dashboard API access is needed or granted). ----
   if (role === "client") {
     const home = clientId ? `/accounts/${clientId}/content` : "/login";
-    const okApi = ["/api/content", "/api/content-media", "/api/nav", "/api/me", "/api/logout"];
+    const okApi = ["/api/content", "/api/content-media", "/api/nav", "/api/me", "/api/logout", "/api/metric"];
     const allowed =
       (clientId && pathname.startsWith(`/accounts/${clientId}/content`)) ||
       (clientId && pathname.startsWith(`/accounts/${clientId}/dashboard`)) ||

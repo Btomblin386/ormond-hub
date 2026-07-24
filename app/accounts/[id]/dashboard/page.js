@@ -29,7 +29,7 @@ export default async function AccountDashboard({ params, searchParams }) {
 
       <AccountTabs accountId={acct.id} active="dashboard" role={role} />
 
-      <ClientDashboard accountId={acct.id} dashboardId={dash.id} sections={sections} days={days} ranges={RANGES} canEdit={canEdit} />
+      <ClientDashboard accountId={acct.id} clientId={acct.client_id} dashboardId={dash.id} sections={sections} days={days} ranges={RANGES} canEdit={canEdit} />
     </Shell>
   );
 }
