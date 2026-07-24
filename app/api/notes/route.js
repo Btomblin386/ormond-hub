@@ -33,13 +33,13 @@ export async function POST(req) {
     }
     if (b.op === "add_item") {
       if (!b.groupId || !b.clientId || !String(b.name || "").trim()) return NextResponse.json({ error: "missing args" }, { status: 400 });
-      const [row] = await createNoteItem({ groupId: b.groupId, clientId: b.clientId, name: String(b.name).trim() });
+      const [row] = await createNoteItem({ groupId: b.groupId, clientId: b.clientId, name: String(b.name).trim(), parentId: b.parentId || null });
       return NextResponse.json({ ok: true, id: row.id });
     }
     if (b.op === "patch_item") {
       if (!b.id) return NextResponse.json({ error: "missing id" }, { status: 400 });
       if (b.status && !["none", "working", "stuck", "done"].includes(b.status)) return NextResponse.json({ error: "bad status" }, { status: 400 });
-      await patchNoteItem(b.id, { name: b.name, status: b.status });
+      await patchNoteItem(b.id, { name: b.name, status: b.status, subOpen: b.subOpen });
       return NextResponse.json({ ok: true });
     }
     if (b.op === "item_details") {
@@ -49,7 +49,7 @@ export async function POST(req) {
     }
     if (b.op === "reorder") {
       if (!b.groupId || !Array.isArray(b.ids)) return NextResponse.json({ error: "bad args" }, { status: 400 });
-      await reorderNoteItems(b.groupId, b.ids);
+      await reorderNoteItems(b.groupId, b.ids, b.parentId || null);
       return NextResponse.json({ ok: true });
     }
     if (b.op === "delete_item") {

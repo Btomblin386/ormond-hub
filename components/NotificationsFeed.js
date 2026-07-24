@@ -96,7 +96,7 @@ export default function NotificationsFeed({ data }) {
           <span className="notif-dot approval" />
           <div className="notif-body">
             <div className="notif-title">🔔 Note reminder · <Link href={`/accounts/${t.client_id}/notes`}>{t.client}</Link> <span className="notif-when">{fmtWhen(t.due_at)}</span></div>
-            <div className="notif-sub">{t.group_name ? `${t.group_name} · ` : ""}{t.title}</div>
+            <div className="notif-sub">{t.group_name ? `${t.group_name} · ` : ""}{t.parent_name ? `${t.parent_name} → ` : ""}{t.title}</div>
           </div>
           <button className="rule-ack" disabled={busy === "nr" + t.id} onClick={async () => {
             setBusy("nr" + t.id);
