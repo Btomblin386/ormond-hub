@@ -7,6 +7,7 @@ import DropboxPicker from "./DropboxPicker";
 import ImageEditor from "./ImageEditor";
 import WhenPicker from "./WhenPicker";
 import PostPreview from "./PostPreview";
+import { pasteWithBullets } from "../lib/paste";
 
 /* --------- Text formatting (Instagram/Facebook show no markdown, so bold and
    italic are done with Unicode math alphabet characters that survive posting). */
@@ -569,7 +570,8 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
               <CharCount value={caption} channels={selChans} />
             </div>
             <FormatBar textareaRef={sharedRef} value={caption} onChange={setCaption} />
-            <textarea ref={sharedRef} rows={5} value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Write the post…" />
+            <textarea ref={sharedRef} rows={5} value={caption} onChange={(e) => setCaption(e.target.value)}
+              onPaste={(e) => pasteWithBullets(e, caption, setCaption)} placeholder="Write the post…" />
           </div>
           <div className="cmp-field">
             <label>Post type</label>
@@ -588,7 +590,8 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
                 <span className={"charcount" + ((variants[ch]?.caption || "").length > LIMITS[ch] ? " over" : "")}>{(variants[ch]?.caption || "").length}/{LIMITS[ch].toLocaleString()}</span>
               </div>
               <FormatBar textareaRef={tabRef} value={variants[ch]?.caption || ""} onChange={(v) => setVar(ch, "caption", v)} />
-              <textarea ref={tabRef} rows={5} value={variants[ch]?.caption || ""} onChange={(e) => setVar(ch, "caption", e.target.value)} placeholder={ch === "instagram" ? "IG caption — @mentions, #hashtags…" : ch === "tiktok" ? "TikTok caption — becomes the video description in drafts…" : "Facebook caption…"} />
+              <textarea ref={tabRef} rows={5} value={variants[ch]?.caption || ""} onChange={(e) => setVar(ch, "caption", e.target.value)}
+                onPaste={(e) => pasteWithBullets(e, variants[ch]?.caption || "", (v) => setVar(ch, "caption", v))} placeholder={ch === "instagram" ? "IG caption — @mentions, #hashtags…" : ch === "tiktok" ? "TikTok caption — becomes the video description in drafts…" : "Facebook caption…"} />
               {ch !== "tiktok" && <div style={{ marginTop: 8 }}><label>Post type</label><TypePicker value={variants[ch]?.post_type || "feed"} onChange={(v) => setVar(ch, "post_type", v)} /></div>}
             </div>
           ))}
@@ -734,7 +737,8 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
             <label>First comment <span className="muted">(posted right after)</span></label>
             <button type="button" className="cmp-collapse" onClick={() => { setFirstComment(""); setShowFirst(false); }}>Remove</button>
           </div>
-          <textarea rows={2} value={firstComment} onChange={(e) => setFirstComment(e.target.value)} placeholder="Drop links or extra hashtags here…" />
+          <textarea rows={2} value={firstComment} onChange={(e) => setFirstComment(e.target.value)}
+            onPaste={(e) => pasteWithBullets(e, firstComment, setFirstComment)} placeholder="Drop links or extra hashtags here…" />
         </div>
       ) : (
         <button type="button" className="cmp-add" onClick={() => setShowFirst(true)}>+ Add a first comment</button>

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import WhenPicker, { TimePicker } from "./WhenPicker";
 import PostPreview from "./PostPreview";
+import { pasteWithBullets } from "../lib/paste";
 
 const STATUS_LABEL = {
   draft: "Draft", needs_approval: "Needs approval", needs_revisions: "Needs revisions", approved: "Approved",
@@ -393,7 +394,8 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
                 </div>
                 {qWhen && <div className="muted" style={{ fontSize: 11, marginBottom: 6 }}>📅 {fmtWhen(qWhen)}</div>}
                 <label>Caption</label>
-                <textarea rows={5} value={qCaption} onChange={(e) => setQCaption(e.target.value)} />
+                <textarea rows={5} value={qCaption} onChange={(e) => setQCaption(e.target.value)}
+                  onPaste={(e) => pasteWithBullets(e, qCaption, setQCaption)} />
                 <label>Note {sel.status === "needs_revisions" ? "· revisions requested" : "(for the team)"}</label>
                 <textarea rows={2} value={qNote} onChange={(e) => setQNote(e.target.value)} placeholder="Leave a note — e.g. for Brie to review…" />
                 <div className="cal-quick-actions">
