@@ -905,9 +905,15 @@ export default function ContentManager({ clientId, client, items, socials, tikto
   const toggleCheck = (id) => setChecked((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
   const selectable = items.filter((it) => it.status !== "published" && it.status !== "publishing").map((it) => it.id);
 
+  const [confirmBulk, setConfirmBulk] = useState(false);
   async function bulk(op, opts = {}) {
     if (!checked.length) return;
-    if (op === "delete" && !window.confirm(`Delete ${checked.length} item(s)?`)) return;
+    if (op === "delete" && !confirmBulk) {
+      setConfirmBulk(true);
+      setTimeout(() => setConfirmBulk(false), 4000);
+      return;
+    }
+    setConfirmBulk(false);
     setBusy("bulk");
     try {
       for (const id of checked) {
@@ -966,11 +972,22 @@ export default function ContentManager({ clientId, client, items, socials, tikto
       router.refresh();
     } finally { setBusy(""); }
   }
+  // Two-step in-page confirm — native window.confirm can be silently suppressed
+  // by the browser ("prevent additional dialogs"), making Delete look dead.
+  const [confirmDel, setConfirmDel] = useState(null);
   async function del(id) {
-    if (!window.confirm("Delete this content item?")) return;
+    if (confirmDel !== id) {
+      setConfirmDel(id);
+      setTimeout(() => setConfirmDel((c) => (c === id ? null : c)), 4000);
+      return;
+    }
+    setConfirmDel(null);
     setBusy(id + "del");
     try {
-      await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "delete", id }) });
+      const r = await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "delete", id }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || d.error) flash("Delete failed: " + (d.error || `HTTP ${r.status}`));
+      else flash("Deleted.");
       router.refresh();
     } finally { setBusy(""); }
   }
@@ -1009,7 +1026,10 @@ export default function ContentManager({ clientId, client, items, socials, tikto
               <div className="bulk-actions">
                 <button className="social-btn" disabled={busy === "bulk"} onClick={() => bulk("needs_approval")}>Submit</button>
                 <button className="cal-approve" disabled={busy === "bulk"} onClick={() => bulk("approved")}>Approve</button>
-                <button className="rule-del" disabled={busy === "bulk"} onClick={() => bulk("delete")}>Delete</button>
+                <button className="rule-del" disabled={busy === "bulk"} onClick={() => bulk("delete")}
+                  style={confirmBulk ? { background: "#b91c1c", color: "#fff", borderColor: "#b91c1c" } : undefined}>
+                  {confirmBulk ? `Really delete ${checked.length}?` : "Delete"}
+                </button>
               </div>
             )}
           </div>
@@ -1064,7 +1084,12 @@ export default function ContentManager({ clientId, client, items, socials, tikto
                 {it.status === "needs_approval" && <button disabled={busy === it.id + "rev"} onClick={() => requestRevisions(it.id)}>Request revisions</button>}
                 {(it.status === "draft" || it.status === "needs_approval" || it.status === "needs_revisions") && <button className="cal-approve" disabled={busy === it.id + "approved"} onClick={() => itemAction(it.id, "approved")}>Approve</button>}
                 {["approved", "scheduled"].includes(it.status) && <button disabled={busy === it.id + "draft"} onClick={() => itemAction(it.id, "draft")}>Unschedule</button>}
-                {it.status !== "published" && <button className="rule-del" disabled={busy === it.id + "del"} onClick={() => del(it.id)}>Delete</button>}
+                {it.status !== "published" && (
+                  <button className="rule-del" disabled={busy === it.id + "del"} onClick={() => del(it.id)}
+                    style={confirmDel === it.id ? { background: "#b91c1c", color: "#fff", borderColor: "#b91c1c" } : undefined}>
+                    {busy === it.id + "del" ? "Deleting…" : confirmDel === it.id ? "Really delete?" : "Delete"}
+                  </button>
+                )}
               </div>
             </div>
           ))}

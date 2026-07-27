@@ -55,7 +55,8 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
   const [qNote, setQNote] = useState("");
   const [qWhen, setQWhen] = useState("");
   const [pvCh, setPvCh] = useState(null);
-  useEffect(() => { setQCaption(sel?.caption || ""); setQNote(sel?.note || ""); setQWhen(sel?.scheduled_at ? toLocalInput(sel.scheduled_at) : ""); setPvCh(sel?.channels?.[0] || null); }, [sel]);
+  const [sureDel, setSureDel] = useState(false);
+  useEffect(() => { setQCaption(sel?.caption || ""); setQNote(sel?.note || ""); setQWhen(sel?.scheduled_at ? toLocalInput(sel.scheduled_at) : ""); setPvCh(sel?.channels?.[0] || null); setSureDel(false); }, [sel]);
 
   async function saveQuickTime() {
     setBusy("q");
@@ -409,11 +410,14 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
               {["draft", "needs_approval", "needs_revisions"].includes(sel.status) && <button className="cal-approve" onClick={() => act(sel.id, "approved")}>Approve &amp; schedule</button>}
               {["needs_approval", "approved", "scheduled"].includes(sel.status) && <button className="cal-reject" onClick={() => act(sel.id, "draft")}>Send back to draft</button>}
               {sel.status !== "published" && sel.status !== "publishing" && (
-                <button className="rule-del" disabled={busy === "del"} onClick={async () => {
-                  if (!window.confirm("Delete this post?")) return;
-                  setBusy("del");
-                  try { await post("delete", { id: sel.id }); setSel(null); } finally { setBusy(""); }
-                }}>Delete</button>
+                <button className="rule-del" disabled={busy === "del"}
+                  style={sureDel ? { background: "#b91c1c", color: "#fff", borderColor: "#b91c1c" } : undefined}
+                  onClick={async () => {
+                    // In-page confirm: window.confirm can be silently suppressed by the browser.
+                    if (!sureDel) { setSureDel(true); setTimeout(() => setSureDel(false), 4000); return; }
+                    setBusy("del");
+                    try { await post("delete", { id: sel.id }); setSel(null); } finally { setBusy(""); }
+                  }}>{busy === "del" ? "Deleting…" : sureDel ? "Really delete?" : "Delete"}</button>
               )}
             </div>
               </div>
