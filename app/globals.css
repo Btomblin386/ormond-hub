@@ -1058,3 +1058,9 @@ video.mention-media { max-width: 240px; border-radius: 8px; }
 .dw-bd-bar { flex: 1; height: 8px; background: #f0f1f4; border-radius: 999px; overflow: hidden; }
 .dw-bd-bar span { display: block; height: 100%; background: #6366f1; border-radius: 999px; }
 .dw-bd-row b { width: 84px; text-align: right; }
+
+/* Day sheet rows: checkbox selects, the rest of the row opens the post */
+.sheet-open { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; cursor: pointer; border-radius: 8px; padding: 3px 6px; }
+.sheet-open:hover { background: #f5f7ff; }
+.sheet-arrow { margin-left: auto; color: #6366f1; font-weight: 700; opacity: 0; transition: opacity .12s; }
+.sheet-open:hover .sheet-arrow { opacity: 1; }

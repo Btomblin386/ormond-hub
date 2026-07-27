@@ -128,7 +128,9 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
   }
   async function bulkDay(action) {
     if (!dayChecked.length) return;
-    if (action === "delete" && !window.confirm(`Delete ${dayChecked.length} post(s)?`)) return;
+    // In-page two-step confirm (window.confirm can be browser-suppressed).
+    if (action === "delete" && !sureDel) { setSureDel(true); setTimeout(() => setSureDel(false), 4000); return; }
+    if (action === "delete") setSureDel(false);
     setBusy("sheet");
     try {
       for (const id of dayChecked) {
@@ -300,13 +302,18 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
               {(byDate[daySheet.key] || []).map((it) => {
                 const locked = it.status === "published" || it.status === "publishing";
                 return (
-                  <label key={it.id} className={"sheet-row" + (locked ? " locked" : "")}>
+                  <div key={it.id} className={"sheet-row" + (locked ? " locked" : "")}>
                     <input type="checkbox" disabled={locked} checked={dayChecked.includes(it.id)}
                       onChange={() => setDayChecked((c) => c.includes(it.id) ? c.filter((x) => x !== it.id) : [...c, it.id])} />
-                    <span className={"cbadge " + it.status}>{STATUS_LABEL[it.status]}</span>
-                    {showClient && <b style={{ fontSize: 12 }}>{it.client}</b>}
-                    <span className="sheet-cap">{fmtTime(it.scheduled_at)} · {it.caption?.slice(0, 60) || "(no caption)"}</span>
-                  </label>
+                    {/* Everything right of the checkbox opens the single-post preview */}
+                    <span className="sheet-open" title="Open this post"
+                      onClick={() => { setDaySheet(null); setSel(it); }}>
+                      <span className={"cbadge " + it.status}>{STATUS_LABEL[it.status]}</span>
+                      {showClient && <b style={{ fontSize: 12 }}>{it.client}</b>}
+                      <span className="sheet-cap">{fmtTime(it.scheduled_at)} · {it.caption?.slice(0, 60) || "(no caption)"}</span>
+                      <span className="sheet-arrow">→</span>
+                    </span>
+                  </div>
                 );
               })}
             </div>
@@ -320,7 +327,10 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
               <button className="cal-approve" disabled={busy === "sheet" || !dayChecked.length} onClick={() => bulkDay("approve")}>Approve</button>
               <input type="date" value={moveTo} onChange={(e) => setMoveTo(e.target.value)} style={{ border: "1px solid #d1d5db", borderRadius: 8, padding: "5px 8px", fontSize: 12 }} />
               <button className="cal-reject" disabled={busy === "sheet" || !dayChecked.length || !moveTo} onClick={() => bulkDay("move")}>Move</button>
-              <button className="rule-del" disabled={busy === "sheet" || !dayChecked.length} onClick={() => bulkDay("delete")}>Delete</button>
+              <button className="rule-del" disabled={busy === "sheet" || !dayChecked.length} onClick={() => bulkDay("delete")}
+                style={sureDel ? { background: "#b91c1c", color: "#fff", borderColor: "#b91c1c" } : undefined}>
+                {sureDel ? `Really delete ${dayChecked.length}?` : "Delete"}
+              </button>
             </div>
           </div>
         </div>
