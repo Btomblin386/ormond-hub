@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { fileToB64, uploadImage, uploadVideoSigned, imageSize, IG_FEED_MIN, IG_FEED_MAX, videoMeta, validateReel } from "../lib/media";
+import { fileToB64, uploadVideoSigned, dataUrlToBlob, imageSize, IG_FEED_MIN, IG_FEED_MAX, videoMeta, validateReel } from "../lib/media";
 import DropboxPicker from "./DropboxPicker";
 import ImageEditor from "./ImageEditor";
 import WhenPicker from "./WhenPicker";
@@ -373,28 +373,38 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
   async function onFiles(e) {
     await uploadFiles([...e.target.files]);
   }
+  const [uploadErrs, setUploadErrs] = useState({}); // filename -> persistent error message
   async function uploadFiles(files) {
     files = files.filter((f) => f.type.startsWith("image/"));
     if (!files.length) return;
     setUploading(true); setIgWarn("");
-    try {
-      for (const f of files) {
-        const b64 = await fileToB64(f);
+    // Signed direct-to-storage upload (same path as video) — the old base64
+    // route died at Vercel's ~4.5MB request cap, so big photos hit 100% then
+    // silently failed. One bad file no longer stops the rest.
+    for (const f of files) {
+      try {
         if (selChans.includes("instagram")) {
           try {
-            const s = await imageSize(b64);
+            const s = await imageSize(await fileToB64(f));
             if (baseType === "feed" && (s.ratio < IG_FEED_MIN - 0.02 || s.ratio > IG_FEED_MAX + 0.02))
               setIgWarn("This image's shape is outside Instagram feed limits (portrait 4:5 to landscape 1.91:1). Click ✎ Edit in Studio to reframe it so it isn't rejected.");
             else if (s.w < 1080)
               setIgWarn(`This image is only ${s.w}px wide. Instagram displays feed images at 1080px, so it'll be upscaled and look soft — use a source at least 1080px wide for the sharpest result.`);
+            else if (f.size > 8 * 1024 * 1024)
+              setIgWarn(`${f.name} is ${(f.size / 1048576).toFixed(1)}MB — over Instagram's 8MB image limit, so IG may reject it at publish time. ✎ Edit in Studio (even a light crop) re-saves it smaller.`);
           } catch {}
         }
         setProgress((p) => ({ ...p, [f.name]: 0 }));
-        const d = await uploadImage({ image_base64: b64, filename: f.name, onProgress: (pct) => setProgress((p) => ({ ...p, [f.name]: pct })) });
+        const d = await uploadVideoSigned({ file: f, onProgress: (pct) => setProgress((p) => ({ ...p, [f.name]: pct })) });
         if (d.url) setMedia((m) => [...m, d.url]);
+        setUploadErrs((e) => { const n = { ...e }; delete n[f.name]; return n; });
+      } catch (err) {
+        setUploadErrs((e) => ({ ...e, [f.name]: err.message || String(err) }));
+      } finally {
         setProgress((p) => { const n = { ...p }; delete n[f.name]; return n; });
       }
-    } catch (err) { flash("Upload failed: " + (err.message || err)); } finally { setUploading(false); }
+    }
+    setUploading(false);
   }
 
   async function onVideoFiles(files) {
@@ -438,8 +448,7 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
     if (!f) return;
     setCUploading(true);
     try {
-      const b64 = await fileToB64(f);
-      const d = await uploadImage({ image_base64: b64, filename: f.name });
+      const d = await uploadVideoSigned({ file: f });
       if (d.url) setCoverUrl(d.url);
     } catch (err) { flash("Cover upload failed: " + (err.message || err)); } finally { setCUploading(false); }
   }
@@ -674,6 +683,12 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
               <span className="upl-pct">{pct}%</span>
             </div>
           ))}
+          {Object.entries(uploadErrs).map(([name, m]) => (
+            <div key={name} className="cmp-warn" style={{ marginTop: 6, display: "flex", gap: 8, alignItems: "baseline" }}>
+              <span style={{ flex: 1 }}>✗ <b>{name}</b> didn&apos;t upload — {m}</span>
+              <button type="button" className="cmp-collapse" onClick={() => setUploadErrs((e) => { const n = { ...e }; delete n[name]; return n; })}>dismiss</button>
+            </div>
+          ))}
           {igWarn && <div className="cmp-warn">⚠ {igWarn}</div>}
           {media.length > 0 && (
             <>
@@ -708,9 +723,10 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
               onApply={async (dataUrl) => {
                 setUploading(true);
                 try {
-                  const d = await uploadImage({ image_base64: dataUrl, filename: "edited.jpg" });
+                  // Signed path — big edited canvases also blow the base64 route's size cap.
+                  const d = await uploadVideoSigned({ file: new File([dataUrlToBlob(dataUrl)], `edited-${Date.now()}.jpg`, { type: "image/jpeg" }) });
                   if (d.url) setMedia((m) => m.map((u, i) => (i === editorIdx ? d.url : u)));
-                } finally { setUploading(false); }
+                } catch (err) { flash("Couldn't save the edit: " + (err.message || err)); } finally { setUploading(false); }
               }}
               onClose={() => setEditorIdx(null)} />
           )}

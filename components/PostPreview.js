@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState } from "react";
 
 // Live post preview card — how a post will look on the chosen channel.
 // Shared by the composer (right-side pane) and the calendar quick-view modal.
@@ -10,6 +11,13 @@ export default function PostPreview({ channel, options = [], brandLogo, caption,
   const handle = rawHandle.replace(/^@/, "");
   const showVideo = usesVideo && !!videoUrl;
   const imgs = Array.isArray(media) ? media : [];
+  // Render feed images at their TRUE aspect ratio (clamped to IG's 4:5–1.91:1
+  // feed limits) — a fixed square box silently mis-crops the preview, which is
+  // exactly what a preview must never do.
+  const [natRatio, setNatRatio] = useState(null);
+  useEffect(() => { setNatRatio(null); }, [imgs[0]]); // eslint-disable-line react-hooks/exhaustive-deps
+  const tall = showVideo || postType === "reel" || postType === "story";
+  const feedRatio = !tall && natRatio ? Math.min(1.91, Math.max(0.8, natRatio)) : null;
   const TRUNC = 125;
   const text = caption || "";
   const feedTrunc = !isTT && [...text].length > TRUNC ? [...text].slice(0, TRUNC).join("") : null;
@@ -21,11 +29,11 @@ export default function PostPreview({ channel, options = [], brandLogo, caption,
         <div className="pv-name">{isIG || isTT ? handle : rawHandle}</div>
         <span className="pv-more">⋯</span>
       </div>
-      <div className={"pv-media" + (showVideo || postType === "reel" || postType === "story" ? " tall" : "")}>
+      <div className={"pv-media" + (tall ? " tall" : "")} style={feedRatio ? { aspectRatio: String(feedRatio) } : undefined}>
         {showVideo
           ? <video src={videoUrl} controls muted playsInline preload="metadata" poster={coverUrl || undefined} />
           : imgs.length
-            ? <img src={imgs[0]} alt="" />
+            ? <img src={imgs[0]} alt="" onLoad={(e) => setNatRatio(e.target.naturalWidth / e.target.naturalHeight)} />
             : <div className="pv-media-empty">Media preview</div>}
         {!showVideo && imgs.length > 1 && <span className="pv-count">1 / {imgs.length}</span>}
       </div>
