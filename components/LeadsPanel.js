@@ -21,6 +21,32 @@ export default function LeadsPanel({ clientId, client, leads, leadEmails, emailC
   const [openId, setOpenId] = useState(null);
   const flash = (t) => { setMsg(t); setTimeout(() => setMsg(""), 6000); };
 
+  // ---- search / filter / range / day-grouping ----
+  const [q, setQ] = useState("");
+  const [fStatus, setFStatus] = useState("all");
+  const [fPlat, setFPlat] = useState("all");
+  const [fDays, setFDays] = useState(30);
+  const [closedDays, setClosedDays] = useState({}); // dayKey -> true (collapsed)
+  const cutoff = fDays ? Date.now() - fDays * 86400000 : 0;
+  const ql = q.trim().toLowerCase();
+  const matches = (l) => {
+    if (fStatus !== "all" && l.status !== fStatus) return false;
+    if (fPlat !== "all" && (l.platform === "ig" ? "instagram" : "facebook") !== fPlat) return false;
+    if (cutoff && new Date(l.created_time).getTime() < cutoff) return false;
+    if (!ql) return true;
+    const hay = [l.full_name, l.email, l.phone, l.form_name, l.ad_name, l.campaign_name].join(" ").toLowerCase();
+    return ql.split(/\s+/).every((t) => hay.includes(t));
+  };
+  const filtered = leads.filter(matches);
+  const dayKey = (v) => new Date(v).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  const groups = [];
+  for (const l of filtered) {
+    const k = dayKey(l.created_time);
+    if (!groups.length || groups[groups.length - 1].key !== k) groups.push({ key: k, leads: [] });
+    groups[groups.length - 1].leads.push(l);
+  }
+  const nCount = (s) => leads.filter((l) => s === "all" ? true : l.status === s).length;
+
   // Which addresses are typed now, and whether they differ from what's saved.
   const parsed = emails.split(/[,;\s]+/).map((e) => e.trim()).filter(Boolean);
   const dirty = JSON.stringify(parsed) !== JSON.stringify(savedEmails);
@@ -92,11 +118,41 @@ export default function LeadsPanel({ clientId, client, leads, leadEmails, emailC
 
       {msg && <div className="mng-msg">{msg}</div>}
 
+      {leads.length > 0 && (
+        <div className="lead-toolbar">
+          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔎 Search name, email, phone, form, campaign…" className="lead-search" />
+          <div className="lead-chips">
+            {[["all", "All"], ["new", "New"], ["emailed", "Emailed"], ["contacted", "Contacted"]].map(([k, lbl]) => (
+              <button key={k} className={"pv-tab" + (fStatus === k ? " on" : "")} onClick={() => setFStatus(k)}>{lbl} <span className="lead-chip-n">{nCount(k)}</span></button>
+            ))}
+          </div>
+          <select value={fPlat} onChange={(e) => setFPlat(e.target.value)} className="lead-sel" aria-label="Platform">
+            <option value="all">FB + IG</option>
+            <option value="facebook">Facebook</option>
+            <option value="instagram">Instagram</option>
+          </select>
+          <div className="lead-chips">
+            {[[7, "7d"], [30, "30d"], [90, "90d"], [0, "All time"]].map(([d, lbl]) => (
+              <button key={d} className={"pv-tab" + (fDays === d ? " on" : "")} onClick={() => setFDays(d)}>{lbl}</button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {leads.length === 0 ? (
         <div className="muted" style={{ fontSize: 13 }}>No leads yet. They&apos;ll appear here as soon as someone submits a lead form.</div>
+      ) : filtered.length === 0 ? (
+        <div className="muted" style={{ fontSize: 13 }}>No leads match — clear the search or widen the date range.</div>
       ) : (
         <div className="lead-list">
-          {leads.map((l) => (
+          <div className="muted" style={{ fontSize: 11.5, marginBottom: 4 }}>Showing {filtered.length} of {leads.length} lead(s)</div>
+          {groups.map((g) => (
+            <div key={g.key}>
+              <button className="lead-day" onClick={() => setClosedDays((c) => ({ ...c, [g.key]: !c[g.key] }))}>
+                <span className="lead-day-caret">{closedDays[g.key] ? "▸" : "▾"}</span>
+                {g.key} <span className="lead-chip-n">{g.leads.length}</span>
+              </button>
+              {!closedDays[g.key] && g.leads.map((l) => (
             <div key={l.id} className="lead-row">
               <div className="lead-main" onClick={() => setOpenId(openId === l.id ? null : l.id)}>
                 <div className="lead-top">
@@ -131,6 +187,8 @@ export default function LeadsPanel({ clientId, client, leads, leadEmails, emailC
                   ? <button className="cal-approve" disabled={busy === l.id} onClick={() => mark(l.id, "contacted")}>Mark contacted</button>
                   : <button disabled={busy === l.id} onClick={() => mark(l.id, "new")}>Reopen</button>}
               </div>
+            </div>
+              ))}
             </div>
           ))}
         </div>
