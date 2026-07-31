@@ -74,7 +74,30 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
   async function saveQuick() { setBusy("q"); try { await post("patch", { id: sel.id, caption: qCaption, note: qNote }); setSel(null); } finally { setBusy(""); } }
   async function reqRevisions() { setBusy("q"); try { await post("revisions", { id: sel.id, note: qNote }); setSel(null); } finally { setBusy(""); } }
   function openComposer() { setSel(null); router.push(`/accounts/${sel.client_id}/content?edit=${sel.id}`); }
-  async function retryChan(id, channel) { setBusy(id + channel); try { await post("retry_channel", { id, channel }); setSel(null); } finally { setBusy(""); } }
+  // Keep the modal open and let it live-update: the retry kicks the publisher
+  // immediately, so the result usually lands within ~5-30s.
+  const [retrying, setRetrying] = useState(null); // channel currently retrying
+  async function retryChan(id, channel) {
+    setBusy(id + channel);
+    setRetrying(channel);
+    try {
+      await post("retry_channel", { id, channel });
+      [4000, 12000, 25000].forEach((ms) => setTimeout(() => router.refresh(), ms));
+      setTimeout(() => setRetrying(null), 32000);
+    } finally { setBusy(""); }
+  }
+  // Sync the open modal with fresh server data (retry outcomes, status flips).
+  useEffect(() => {
+    if (!sel) return;
+    const u = items.find((x) => x.id === sel.id);
+    if (!u) return;
+    if (u.status !== sel.status || u.fb_post_id !== sel.fb_post_id || u.ig_post_id !== sel.ig_post_id ||
+        u.tiktok_publish_id !== sel.tiktok_publish_id || u.error !== sel.error) {
+      setSel(u);
+      setRetrying(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
 
   const year = cursor.getFullYear(), month = cursor.getMonth();
   const startPad = new Date(year, month, 1).getDay();
@@ -405,7 +428,12 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
                 </div>
               </div>
             )}
-            {sel.error && <div className="push-err">{sel.error}</div>}
+            {sel.error && !retrying && <div className="push-err">{sel.error}</div>}
+            {retrying && (
+              <div className="cmp-warn" style={{ background: "#eef2ff", borderColor: "#c7d2fe", color: "#3730a3" }}>
+                ↻ Retrying {{ facebook: "Facebook", instagram: "Instagram", tiktok: "TikTok" }[retrying] || retrying} — publishing now… this window updates automatically (usually under 30s).
+              </div>
+            )}
             {sel.status === "failed" && sel.channels?.length > 0 && (
               <div className="chan-retry">
                 {sel.channels.map((ch) => {
@@ -413,7 +441,9 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
                   const LBL = { facebook: "Facebook", instagram: "Instagram", tiktok: "TikTok" };
                   return posted
                     ? <span key={ch} className="chan-chip ok" title="Already published — won't re-post">{LBL[ch] || ch} ✓</span>
-                    : <button key={ch} className="chan-chip retry" disabled={busy === sel.id + ch} onClick={() => retryChan(sel.id, ch)}>↻ Retry {LBL[ch] || ch}</button>;
+                    : <button key={ch} className="chan-chip retry" disabled={busy === sel.id + ch || !!retrying} onClick={() => retryChan(sel.id, ch)}>
+                        {retrying === ch ? "↻ Retrying…" : `↻ Retry ${LBL[ch] || ch}`}
+                      </button>;
                 })}
               </div>
             )}

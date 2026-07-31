@@ -980,6 +980,8 @@ export default function ContentManager({ clientId, client, items, socials, tikto
     setBusy(id + "rc" + channel);
     try {
       await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "retry_channel", id, channel }) });
+      flash(`↻ Retrying ${channel[0].toUpperCase()}${channel.slice(1)} — publishing now; the status updates here within ~30s.`);
+      [4000, 12000, 25000].forEach((ms) => setTimeout(() => router.refresh(), ms));
       router.refresh();
     } finally { setBusy(""); }
   }
