@@ -267,6 +267,17 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
   // Instagram Shopping product tags: [{product_id, name, image}]
   const [productTags, setProductTags] = useState(() => (Array.isArray(editItem?.product_tags) ? editItem.product_tags : []));
   const [shopOpen, setShopOpen] = useState(() => Array.isArray(editItem?.product_tags) && editItem.product_tags.length > 0);
+  // Instagram collab posts + per-photo people tags (IG API only; FB has no equivalent).
+  const [igCollabs, setIgCollabs] = useState(() => (Array.isArray(editItem?.collaborators) ? editItem.collaborators.join(", ") : ""));
+  const [collabOpen, setCollabOpen] = useState(() => Array.isArray(editItem?.collaborators) && editItem.collaborators.length > 0);
+  const [igTags, setIgTags] = useState(() => {
+    const src = editItem?.user_tags || {};
+    const o = {};
+    for (const k of Object.keys(src)) o[k] = (src[k] || []).join(", ");
+    return o;
+  });
+  const [tagPeopleOpen, setTagPeopleOpen] = useState(() => !!editItem?.user_tags && Object.keys(editItem.user_tags).length > 0);
+  const parseUsers = (s) => String(s || "").split(/[,\s]+/).map((x) => x.trim().replace(/^@/, "")).filter(Boolean);
   const [shop, setShop] = useState({ loading: false, err: "", enabled: null, catalogId: null, products: [], q: "" });
   const hydratedRef = useRef(false);
   const draftKey = `hub:composer:${clientId}`;
@@ -342,6 +353,8 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
           if (typeof d.coverUrl === "string") setCoverUrl(d.coverUrl);
           if (typeof d.feedVideo === "boolean") setFeedVideo(d.feedVideo);
           if (Array.isArray(d.productTags)) { setProductTags(d.productTags); if (d.productTags.length) setShopOpen(true); }
+          if (typeof d.igCollabs === "string") { setIgCollabs(d.igCollabs); if (d.igCollabs.trim()) setCollabOpen(true); }
+          if (d.igTags && typeof d.igTags === "object") { setIgTags(d.igTags); if (Object.values(d.igTags).some((v) => String(v).trim())) setTagPeopleOpen(true); }
           if (typeof d.firstComment === "string") setFirstComment(d.firstComment);
           if (Array.isArray(d.selKeys)) { const k = d.selKeys.filter((x) => options.some((o) => o.key === x)); if (k.length) setSelKeys(k); }
           if (typeof d.customize === "boolean") setCustomize(d.customize);
@@ -358,16 +371,17 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
     const hasContent = caption.trim() || media.length || videoUrl.trim() || firstComment.trim() ||
       Object.values(variants).some((v) => v?.caption?.trim());
     try {
-      if (hasContent) localStorage.setItem(draftKey, JSON.stringify({ caption, variants, baseType, link, media, videoUrl, coverUrl, feedVideo, firstComment, selKeys, customize, productTags }));
+      if (hasContent) localStorage.setItem(draftKey, JSON.stringify({ caption, variants, baseType, link, media, videoUrl, coverUrl, feedVideo, firstComment, selKeys, customize, productTags, igCollabs, igTags }));
       else localStorage.removeItem(draftKey);
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editItem, caption, variants, baseType, link, media, videoUrl, coverUrl, feedVideo, firstComment, selKeys, customize, productTags]);
+  }, [editItem, caption, variants, baseType, link, media, videoUrl, coverUrl, feedVideo, firstComment, selKeys, customize, productTags, igCollabs, igTags]);
 
   function discardDraft() {
     try { localStorage.removeItem(draftKey); } catch {}
     setCaption(""); setVariants({ facebook: { caption: "", post_type: "feed" }, instagram: { caption: "", post_type: "feed" } });
     setBaseType("feed"); setLink(""); setMedia([]); setVideoUrl(""); setCoverUrl(""); setFeedVideo(false); setFirstComment(""); setCustomize(false); setRestored(false); setProductTags([]); setShopOpen(false);
+    setIgCollabs(""); setCollabOpen(false); setIgTags({}); setTagPeopleOpen(false);
   }
 
   async function onFiles(e) {
@@ -495,9 +509,19 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
       ? Object.fromEntries(selChans.map((ch) => [ch, { caption: variants[ch]?.caption || "", post_type: variants[ch]?.post_type || "feed" }]))
       : {};
     // Post Now = approved with an immediate (past) schedule so the publisher grabs it this run.
+    const igOn = selChans.includes("instagram");
+    const userTags = {};
+    if (igOn && !usesVideo) {
+      media.forEach((_, i) => { const u = parseUsers(igTags[i]); if (u.length) userTags[i] = u.slice(0, 20); });
+    } else if (igOn && usesVideo) {
+      const u = parseUsers(igTags[0]);
+      if (u.length) userTags[0] = u.slice(0, 20);
+    }
     const shared = {
       clientId, caption, link: link || null, mediaUrls, coverUrl: (usesVideo && coverUrl) ? coverUrl : null,
       productTags: selChans.includes("instagram") && productTags.length ? productTags : null,
+      collaborators: igOn && parseUsers(igCollabs).length ? parseUsers(igCollabs).slice(0, 3) : null,
+      userTags: Object.keys(userTags).length ? userTags : null,
       postType: baseType, variants: payloadVariants, firstComment: firstComment || null,
       scheduledAt: postNow ? new Date().toISOString() : (scheduledAt ? new Date(scheduledAt).toISOString() : null),
       publishNow: postNow,
@@ -808,6 +832,42 @@ function Composer({ clientId, socials, tiktok, seedDate, editItem, onDone, onCan
               </>
             )}
           </div>
+        )
+      )}
+
+      {igActive && !plan.some((p) => p.ch === "instagram" && p.type === "story") && (
+        (collabOpen || parseUsers(igCollabs).length > 0) ? (
+          <div className="cmp-field">
+            <div className="cmp-label-row">
+              <label>Collaborators <span className="muted">(Instagram · up to 3 — they get an invite; the post shows on both profiles once accepted)</span></label>
+              <button type="button" className="cmp-collapse" onClick={() => { setIgCollabs(""); setCollabOpen(false); }}>Remove</button>
+            </div>
+            <input type="text" value={igCollabs} onChange={(e) => setIgCollabs(e.target.value)} placeholder="@username, @username" />
+          </div>
+        ) : (
+          <button type="button" className="cmp-add" onClick={() => setCollabOpen(true)}>🤝 Invite collaborators <span className="muted" style={{ fontWeight: 400 }}>(Instagram)</span></button>
+        )
+      )}
+
+      {igActive && !plan.some((p) => p.ch === "instagram" && p.type === "story") && (usesVideo ? !!videoUrl : media.length > 0) && (
+        (tagPeopleOpen || Object.values(igTags).some((v) => String(v).trim())) ? (
+          <div className="cmp-field">
+            <div className="cmp-label-row">
+              <label>Tag people <span className="muted">(Instagram{usesVideo ? "" : " · per photo"})</span></label>
+              <button type="button" className="cmp-collapse" onClick={() => { setIgTags({}); setTagPeopleOpen(false); }}>Remove all</button>
+            </div>
+            {(usesVideo ? [null] : media).map((u, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: i ? 6 : 0 }}>
+                {u ? <img src={u} alt="" style={{ width: 34, height: 34, objectFit: "cover", borderRadius: 6, border: "1px solid #e6e8eb", flexShrink: 0 }} />
+                   : <span className="muted" style={{ fontSize: 11 }}>🎬</span>}
+                {!usesVideo && <span className="muted" style={{ fontSize: 11, width: 14 }}>#{i + 1}</span>}
+                <input type="text" value={igTags[i] || ""} onChange={(e) => setIgTags((t) => ({ ...t, [i]: e.target.value }))}
+                  placeholder="@usernames, comma-separated" style={{ flex: 1 }} />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <button type="button" className="cmp-add" onClick={() => setTagPeopleOpen(true)}>👤 Tag people <span className="muted" style={{ fontWeight: 400 }}>(Instagram{usesVideo ? "" : " · per photo"})</span></button>
         )
       )}
 
