@@ -984,6 +984,11 @@ export default function ContentManager({ clientId, client, items, socials, tikto
   function flash(t) { setMsg(t); setTimeout(() => setMsg(""), 6000); }
   const toggleCheck = (id) => setChecked((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
   const selectable = items.filter((it) => it.status !== "published" && it.status !== "publishing").map((it) => it.id);
+  // Published posts leave the working list (they still show on the calendar as history).
+  // A one-line toggle at the bottom brings them back when someone needs to look one up.
+  const [showPublished, setShowPublished] = useState(false);
+  const publishedCount = items.filter((it) => it.status === "published").length;
+  const visibleItems = showPublished ? items : items.filter((it) => it.status !== "published");
 
   const [confirmBulk, setConfirmBulk] = useState(false);
   async function bulk(op, opts = {}) {
@@ -1096,6 +1101,9 @@ export default function ContentManager({ clientId, client, items, socials, tikto
         <div className="muted" style={{ fontSize: 13 }}>No content yet.</div>
       ) : (
         <>
+        {visibleItems.length === 0 && (
+          <div className="muted" style={{ fontSize: 13 }}>Nothing in the queue — everything here has been published.</div>
+        )}
         {selectable.length > 0 && (
           <div className="bulk-bar">
             <label className="bulk-all">
@@ -1117,7 +1125,7 @@ export default function ContentManager({ clientId, client, items, socials, tikto
           </div>
         )}
         <div className="content-list">
-          {items.map((it) => (
+          {visibleItems.map((it) => (
             <div key={it.id} className="content-row">
               {it.status !== "published" && it.status !== "publishing" && (
                 <input type="checkbox" className="row-check" checked={checked.includes(it.id)} onChange={() => toggleCheck(it.id)} />
@@ -1176,6 +1184,12 @@ export default function ContentManager({ clientId, client, items, socials, tikto
             </div>
           ))}
         </div>
+        {publishedCount > 0 && (
+          <div className="published-toggle">
+            <span className="muted">{showPublished ? `Showing ${publishedCount} published post${publishedCount === 1 ? "" : "s"}` : `${publishedCount} published post${publishedCount === 1 ? "" : "s"} hidden`}</span>
+            <button type="button" onClick={() => setShowPublished((v) => !v)}>{showPublished ? "Hide published" : "Show published"}</button>
+          </div>
+        )}
         </>
       )}
     </div>
