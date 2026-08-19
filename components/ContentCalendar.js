@@ -222,8 +222,12 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
         </div>
       </div>
 
-      <div className="cal-grid cal-dow">{DOW.map((d) => <div key={d} className="cal-dowcell">{d}</div>)}</div>
+      {/* Weekday labels live in the SAME grid as the day cells so they share column tracks.
+          Two separate grids could drift apart (a wide chip/note widened the day columns past
+          1fr while the label row stayed at container width) — that's what made Brie's calendar
+          show Wednesday's column under "Thu". */}
       <div className="cal-grid">
+        {DOW.map((d) => <div key={d} className="cal-dowcell">{d}</div>)}
         {cells.map((d, i) => {
           if (!d) return <div key={i} className="cal-cell empty" />;
           const key = keyOf(d);

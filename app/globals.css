@@ -294,10 +294,11 @@ td a.rowlink { color: #4338ca; font-weight: 600; }
 .cal-nav { display: flex; align-items: center; gap: 14px; margin: 0 auto; }
 .cal-head button { border: 1px solid #d1d5db; background: #fff; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 15px; }
 .cal-title { font-weight: 600; font-size: 14px; min-width: 150px; text-align: center; }
-.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
-.cal-dow { margin-bottom: 6px; }
-.cal-dowcell { font-size: 11px; color: #9ca3af; text-align: center; font-weight: 600; }
-.cal-cell { min-height: 116px; border: 1px solid #eef0f2; border-radius: 8px; padding: 5px; background: #fcfcfd; display: flex; flex-direction: column; gap: 3px; }
+/* minmax(0,1fr): columns may never grow past an equal share, so long chip/note text truncates
+   instead of widening the grid (which is what knocked the weekday labels out of alignment). */
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.cal-dowcell { font-size: 11px; color: #9ca3af; text-align: center; font-weight: 600; padding-bottom: 2px; }
+.cal-cell { min-width: 0; min-height: 116px; border: 1px solid #eef0f2; border-radius: 8px; padding: 5px; background: #fcfcfd; display: flex; flex-direction: column; gap: 3px; }
 .cal-cell.empty { border: 0; background: transparent; }
 .cal-cell.today { border-color: #a5b4fc; background: #f5f3ff; }
 .cal-daynum { font-size: 11px; color: #9ca3af; font-weight: 600; }
