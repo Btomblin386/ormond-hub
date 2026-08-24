@@ -1078,3 +1078,13 @@ video.mention-media { max-width: 240px; border-radius: 8px; }
 .lead-day { display: flex; align-items: center; gap: 7px; width: 100%; text-align: left; border: 0; background: none; cursor: pointer; font-size: 12px; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .03em; padding: 10px 2px 5px; border-bottom: 1px solid #eef0f4; }
 .lead-day:hover { color: #4338ca; }
 .lead-day-caret { color: #6366f1; font-size: 11px; }
+
+/* ---------- Notifications page: alert rules ---------- */
+.alert-form { border: 1px solid #e6e8eb; border-radius: 10px; background: #f8fafc; padding: 14px 16px; margin-bottom: 14px; display: flex; flex-direction: column; gap: 4px; }
+.alert-form select, .alert-form input[type="text"] { border: 1px solid #d1d5db; border-radius: 8px; padding: 7px 10px; font-size: 13px; background: #fff; max-width: 420px; }
+.alert-lbl { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #6b7280; margin-top: 10px; }
+.alert-lbl:first-child { margin-top: 0; }
+.alert-cals { display: flex; flex-wrap: wrap; gap: 6px; }
+.alert-cal { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #d1d5db; background: #fff; border-radius: 999px; padding: 5px 12px; font-size: 12.5px; cursor: pointer; user-select: none; }
+.alert-cal.on { border-color: #6366f1; background: #eef2ff; color: #4338ca; font-weight: 600; }
+.alert-cal input { display: none; }

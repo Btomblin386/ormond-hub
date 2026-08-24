@@ -127,6 +127,7 @@ export default function Shell({ crumb, children, wide }) {
             {/* Reconciliation moved into each account's Google tab; route kept for deep links */}
             {isAgency && <Link href="/onboard" className={"navlink" + (path.startsWith("/onboard") ? " active" : "")}>+ Connect accounts</Link>}
             {isAgency && <Link href="/assistant" className={"navlink" + (path.startsWith("/assistant") ? " active" : "")}>Assistant</Link>}
+            {isAgency && <Link href="/notifications" className={"navlink" + (path.startsWith("/notifications") ? " active" : "")}>Notifications</Link>}
             {isAgency && <Link href="/settings" className={"navlink" + (path.startsWith("/settings") || path.startsWith("/team") ? " active" : "")}>Settings</Link>}
           </nav>
         )}
