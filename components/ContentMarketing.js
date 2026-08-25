@@ -2,6 +2,7 @@
 import { useRef, useState } from "react";
 import ContentManager from "./ContentManager";
 import ContentCalendar from "./ContentCalendar";
+import LiveRefresh from "./LiveRefresh";
 import BrandListener from "./BrandListener";
 import RepurposeStudio from "./RepurposeStudio";
 
@@ -29,6 +30,7 @@ export default function ContentMarketing({ clientId, client, items, social, ment
 
   return (
     <>
+      <LiveRefresh paused={composerOpen} />
       <div id="posts">
         <ContentManager clientId={clientId} client={client} items={items} social={social}
           open={composerOpen} setOpen={setComposerOpen} seedDate={seedDate} />

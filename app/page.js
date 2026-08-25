@@ -3,6 +3,7 @@ import AccountRow from "../components/AccountRow";
 import AccountTrends from "../components/AccountTrends";
 import NotificationsFeed from "../components/NotificationsFeed";
 import ContentCalendar from "../components/ContentCalendar";
+import LiveRefresh from "../components/LiveRefresh";
 import { agencyTotals, accountsList, accountsTrendDaily, agencyNotifications, contentCalendar, lastFullDataDate, agencyNotes } from "../lib/db";
 import { money, num, roas, roasClass } from "../lib/format";
 import { getSession } from "../lib/session";
@@ -58,6 +59,7 @@ export default async function Overview({ searchParams }) {
         <NotificationsFeed data={notifications} />
       </div>
 
+      <LiveRefresh />
       <div className="panel">
         <h2>Content calendar</h2>
         <p className="note">All accounts&apos; scheduled and pending content in one place. Click any item to approve or send back.</p>

@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import ContentManager from "./ContentManager";
 import ContentCalendar from "./ContentCalendar";
+import LiveRefresh from "./LiveRefresh";
 
 export default function ContentBoard({ clientId, client, items, socials, tiktok, editId, notes = [], teamMembers = [], dropbox, dropboxFolder, brandLogo }) {
   const [composerOpen, setComposerOpen] = useState(false);
@@ -20,6 +21,8 @@ export default function ContentBoard({ clientId, client, items, socials, tiktok,
 
   return (
     <>
+      {/* Background data refresh; paused while someone is composing/editing a post. */}
+      <LiveRefresh paused={composerOpen} />
       <div id="posts">
         <ContentManager clientId={clientId} client={client} items={items} socials={socials} tiktok={tiktok}
           open={composerOpen} setOpen={setComposerOpen} seedDate={seedDate} editId={editId}
