@@ -59,20 +59,48 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
   const [sureDel, setSureDel] = useState(false);
   useEffect(() => { setQCaption(sel?.caption || ""); setQNote(sel?.note || ""); setQWhen(sel?.scheduled_at ? toLocalInput(sel.scheduled_at) : ""); setPvCh(sel?.channels?.[0] || null); setSureDel(false); }, [sel]);
 
-  async function saveQuickTime() {
-    setBusy("q");
-    try {
-      await post("reschedule", { id: sel.id, scheduledAt: qWhen ? new Date(qWhen).toISOString() : null });
-      setSel(null);
-    } finally { setBusy(""); }
+  // Unsaved tweaks in the modal (caption / note / scheduled time vs. what's stored)
+  function unsaved() {
+    if (!sel) return { fields: false, time: false };
+    return {
+      fields: qCaption !== (sel.caption || "") || qNote !== (sel.note || ""),
+      time: qWhen !== (sel.scheduled_at ? toLocalInput(sel.scheduled_at) : ""),
+    };
+  }
+  // Push whatever is on screen to the server. Called by Save AND by every
+  // status action (approve/submit/back-to-draft), so approving always
+  // publishes the version you're looking at — never a stale saved copy.
+  async function persistEdits() {
+    const d = unsaved();
+    if (d.fields) await post("patch", { id: sel.id, caption: qCaption, note: qNote });
+    if (d.time) await post("reschedule", { id: sel.id, scheduledAt: qWhen ? new Date(qWhen).toISOString() : null });
+    if (d.fields || d.time) setSel((s) => (s ? { ...s, caption: qCaption, note: qNote, scheduled_at: qWhen ? new Date(qWhen).toISOString() : null } : s));
   }
 
   async function post(op, body, api = "/api/content") {
     await fetch(api, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op, ...body }) });
     router.refresh();
   }
-  async function saveQuick() { setBusy("q"); try { await post("patch", { id: sel.id, caption: qCaption, note: qNote }); setSel(null); } finally { setBusy(""); } }
-  async function reqRevisions() { setBusy("q"); try { await post("revisions", { id: sel.id, note: qNote }); setSel(null); } finally { setBusy(""); } }
+  // Save keeps the modal OPEN (the usual flow is tweak -> save -> approve);
+  // a brief "Saved" tick confirms it landed.
+  const [savedTick, setSavedTick] = useState(false);
+  async function saveQuick() {
+    setBusy("q");
+    try {
+      await persistEdits();
+      setSavedTick(true);
+      setTimeout(() => setSavedTick(false), 2500);
+    } finally { setBusy(""); }
+  }
+  async function reqRevisions() {
+    setBusy("q");
+    try {
+      // Caption tweaks ride along with the revision request too.
+      if (qCaption !== (sel.caption || "")) await post("patch", { id: sel.id, caption: qCaption, note: qNote });
+      await post("revisions", { id: sel.id, note: qNote });
+      setSel(null);
+    } finally { setBusy(""); }
+  }
   function openComposer() { setSel(null); router.push(`/accounts/${sel.client_id}/content?edit=${sel.id}`); }
   // Keep the modal open and let it live-update: the retry kicks the publisher
   // immediately, so the result usually lands within ~5-30s.
@@ -119,12 +147,17 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
   for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d));
 
   async function act(id, status) {
-    if (status === "approved" && sel?.scheduled_at && new Date(sel.scheduled_at).getTime() < Date.now()) {
-      const ok = window.confirm(`The scheduled time (${fmtWhen(sel.scheduled_at)}) has already passed — approving publishes it within a few minutes.\n\nOK — approve & publish shortly.\nCancel — go back and use “Update time” first.`);
+    // Judge "already passed" by the time ON SCREEN (qWhen), not the stored one —
+    // if you just fixed the time, approving uses the fix without a stale warning.
+    const effWhen = qWhen ? new Date(qWhen) : null;
+    if (status === "approved" && effWhen && effWhen.getTime() < Date.now()) {
+      const ok = window.confirm(`The scheduled time (${fmtWhen(effWhen.toISOString())}) has already passed — approving publishes it within a few minutes.\n\nOK — approve & publish shortly.\nCancel — go back and fix the time first.`);
       if (!ok) return;
     }
     setBusy(id + status);
     try {
+      // Any unsaved tweaks go out with the status change — what you see is what publishes.
+      await persistEdits();
       await fetch("/api/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "status", id, status, approvedBy: "agency" }) });
       router.refresh(); setSel(null);
     } finally { setBusy(""); }
@@ -417,7 +450,7 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
                 <label>Scheduled time</label>
                 <div className="cal-time-row">
                   <WhenPicker value={qWhen} onChange={setQWhen} />
-                  <button className="social-btn" disabled={busy === "q" || qWhen === (sel.scheduled_at ? toLocalInput(sel.scheduled_at) : "")} onClick={saveQuickTime}>Update time</button>
+                  <button className="social-btn" disabled={busy === "q" || qWhen === (sel.scheduled_at ? toLocalInput(sel.scheduled_at) : "")} onClick={saveQuick}>Update time</button>
                 </div>
                 {qWhen && <div className="muted" style={{ fontSize: 11, marginBottom: 6 }}>📅 {fmtWhen(qWhen)}</div>}
                 <label>Caption</label>
@@ -426,7 +459,7 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
                 <label>Note {sel.status === "needs_revisions" ? "· revisions requested" : "(for the team)"}</label>
                 <textarea rows={2} value={qNote} onChange={(e) => setQNote(e.target.value)} placeholder="Leave a note — e.g. for Brie to review…" />
                 <div className="cal-quick-actions">
-                  <button className="cal-approve" disabled={busy === "q"} onClick={saveQuick}>Save changes</button>
+                  <button className="cal-approve" disabled={busy === "q"} onClick={saveQuick}>{busy === "q" ? "Saving…" : savedTick ? "Saved ✓" : "Save changes"}</button>
                   <button className="cal-reject" disabled={busy === "q"} onClick={reqRevisions}>Request revisions</button>
                   <button className="cal-reject" onClick={openComposer}>Open in composer →</button>
                 </div>
