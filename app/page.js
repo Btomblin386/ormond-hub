@@ -7,6 +7,7 @@ import LiveRefresh from "../components/LiveRefresh";
 import { agencyTotals, accountsList, accountsTrendDaily, agencyNotifications, contentCalendar, lastFullDataDate, agencyNotes } from "../lib/db";
 import { money, num, roas, roasClass } from "../lib/format";
 import { getSession } from "../lib/session";
+import CookieDiag from "../components/CookieDiag";
 
 export const dynamic = "force-dynamic";
 
@@ -18,15 +19,7 @@ function Landing({ cookieDropped = false }) {
       <h1>Ormond Hub</h1>
       <p className="landing-tag">Ormond Brand Consulting&apos;s private client platform — ad performance analytics,
         Meta ↔ GA4 reconciliation, content scheduling &amp; approvals, and brand listening for the businesses we manage.</p>
-      {cookieDropped && (
-        <div className="landing-warn">
-          <b>You signed in successfully, but your browser didn&apos;t keep the login cookie</b> — so the hub
-          can&apos;t stay signed in. This usually means cookies are blocked (browser privacy settings or an
-          extension), or you&apos;re inside an email app&apos;s built-in browser. Open
-          {" "}<b>ormond-hub.vercel.app</b> directly in Safari or Chrome, check that cookies are allowed,
-          and sign in there.
-        </div>
-      )}
+      {cookieDropped && <CookieDiag />}
       <a className="landing-btn" href="/login">Log in</a>
       <div className="landing-links">
         <a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Service</a> · <a href="/data-deletion">Data Deletion</a>

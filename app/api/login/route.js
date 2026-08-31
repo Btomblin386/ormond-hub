@@ -46,7 +46,12 @@ export async function POST(req) {
           name: u.name || u.email, email: u.email,
           exp: Date.now() + THIRTY_DAYS * 1000,
         });
-        const res = NextResponse.redirect(new URL(landingFor(u.role, u.client_id), req.url), 303);
+        // 200 + meta-refresh instead of Set-Cookie on a 303: certain in-app
+        // browsers/webviews drop cookies attached to redirect responses, which
+        // showed up as "signed in successfully but instantly logged out".
+        const dest = landingFor(u.role, u.client_id);
+        const html = `<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=${dest}"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Signing you in…</title><body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;display:grid;place-items:center;height:100vh;margin:0;color:#6b7280">Signing you in…<script>location.replace(${JSON.stringify(dest)})</script></body>`;
+        const res = new NextResponse(html, { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
         res.cookies.set("hub_session", token, { httpOnly: true, sameSite: "lax", path: "/", maxAge: THIRTY_DAYS });
         return res;
       }
