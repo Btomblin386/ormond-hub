@@ -8,7 +8,11 @@ const THIRTY_DAYS = 60 * 60 * 24 * 30;
 
 function landingFor(role, clientId) {
   if (role === "client" && clientId) return `/accounts/${clientId}/content`;
-  return "/";
+  // ?li=1 marks "arrived here straight from a successful sign-in". If the
+  // browser then shows the logged-out landing page, the session cookie was
+  // dropped — the landing page uses the flag to explain that instead of
+  // silently looping people back to Log in.
+  return "/?li=1";
 }
 
 export async function POST(req) {

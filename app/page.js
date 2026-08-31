@@ -12,12 +12,21 @@ export const dynamic = "force-dynamic";
 
 // Public landing (the OAuth consent screen's "application home page").
 // The dashboard below only renders for a valid session.
-function Landing() {
+function Landing({ cookieDropped = false }) {
   return (
     <div className="landing">
       <h1>Ormond Hub</h1>
       <p className="landing-tag">Ormond Brand Consulting&apos;s private client platform — ad performance analytics,
         Meta ↔ GA4 reconciliation, content scheduling &amp; approvals, and brand listening for the businesses we manage.</p>
+      {cookieDropped && (
+        <div className="landing-warn">
+          <b>You signed in successfully, but your browser didn&apos;t keep the login cookie</b> — so the hub
+          can&apos;t stay signed in. This usually means cookies are blocked (browser privacy settings or an
+          extension), or you&apos;re inside an email app&apos;s built-in browser. Open
+          {" "}<b>ormond-hub.vercel.app</b> directly in Safari or Chrome, check that cookies are allowed,
+          and sign in there.
+        </div>
+      )}
       <a className="landing-btn" href="/login">Log in</a>
       <div className="landing-links">
         <a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Service</a> · <a href="/data-deletion">Data Deletion</a>
@@ -29,7 +38,7 @@ function Landing() {
 
 export default async function Overview({ searchParams }) {
   const session = getSession();
-  if (!session) return <Landing />;
+  if (!session) return <Landing cookieDropped={searchParams?.li === "1"} />;
   const isAgency = session.role === "agency";
   const days = Number(searchParams?.days) || 30;
   const [totals, trendRows, accounts, notifications, calendar, lastFull, notes] = await Promise.all([
