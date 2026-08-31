@@ -55,13 +55,22 @@ export default function TeamManager({ users, clients }) {
   const [resetFor, setResetFor] = useState(null);
   const [newPass, setNewPass] = useState("");
   async function resetPassword(id) {
-    if (newPass.length < 6) { flash("New password must be at least 6 characters."); return; }
+    if (newPass.trim().length < 6) { flash("New password must be at least 6 characters."); return; }
     setBusy(id + "pw");
     try {
       const r = await fetch("/api/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "reset_password", id, password: newPass }) });
       const d = await r.json();
       if (d.error) flash("Error: " + d.error);
       else { flash("Password reset — send the new one to them. It also reactivates the login."); setResetFor(null); setNewPass(""); }
+    } finally { setBusy(""); }
+  }
+  async function emailReset(id) {
+    setBusy(id + "link");
+    try {
+      const r = await fetch("/api/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "send_reset", id }) });
+      const d = await r.json();
+      if (d.error) flash("Error: " + d.error);
+      else flash(`Reset link emailed to ${d.to} — it works once and expires in 30 minutes.`);
     } finally { setBusy(""); }
   }
   function randomPass() {
@@ -125,7 +134,8 @@ export default function TeamManager({ users, clients }) {
                   <option value="creator">Creator</option>
                 </select>
               )}
-              <button className="social-btn" disabled={busy === u.id + "pw"} onClick={() => { setResetFor(resetFor === u.id ? null : u.id); setNewPass(""); }}>{resetFor === u.id ? "Cancel" : "Reset password"}</button>
+              {u.active !== false && <button className="social-btn" disabled={busy === u.id + "link"} onClick={() => emailReset(u.id)} title="Email them a link to choose their own password">{busy === u.id + "link" ? "Sending…" : "Email reset link"}</button>}
+              <button className="social-btn" disabled={busy === u.id + "pw"} onClick={() => { setResetFor(resetFor === u.id ? null : u.id); setNewPass(""); }}>{resetFor === u.id ? "Cancel" : "Set manually"}</button>
               {u.active === false
                 ? <button className="cal-approve" disabled={busy === u.id} onClick={() => reactivate(u.id)}>Reactivate</button>
                 : <button className="rule-del" disabled={busy === u.id} onClick={() => remove(u.id)}>Deactivate</button>}

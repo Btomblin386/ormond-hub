@@ -10,6 +10,7 @@ export default function Login({ searchParams }) {
       <input type="email" name="email" placeholder="Email" autoComplete="username" required />
       <input type="password" name="password" placeholder="Password" autoFocus autoComplete="current-password" required />
       <button type="submit">Sign in</button>
+      <a className="login-alt" href="/forgot">Forgot password?</a>
     </form>
   );
 }

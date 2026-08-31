@@ -14,7 +14,9 @@ function landingFor(role, clientId) {
 export async function POST(req) {
   const form = await req.formData();
   const email = String(form.get("email") || "").trim();
-  const pw = String(form.get("password") || "");
+  // Trimmed: pasted passwords (from a text or email) often carry an invisible
+  // trailing space/newline, which reads as "wrong password". Set-side trims too.
+  const pw = String(form.get("password") || "").trim();
   const master = String(form.get("agency_master") || "") === "1";
 
   // Break-glass agency login: shared password, only from the /agency-master-login
