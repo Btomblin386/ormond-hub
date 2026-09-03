@@ -64,16 +64,6 @@ function relWhen(iso: string): string {
 const STATUS_LABEL: Record<string, string> = { draft: "Draft", needs_approval: "Needs approval", needs_revisions: "Needs revisions", failed: "Failed" };
 const CHAN: Record<string, string> = { facebook: "Facebook", instagram: "Instagram", tiktok: "TikTok" };
 
-function page(title: string, body: string, ok = true) {
-  return new Response(`<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title>
-<body style="margin:0;background:#f6f7f9;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
-<div style="max-width:460px;margin:80px auto;background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:32px;text-align:center">
-<div style="font-size:40px;margin-bottom:10px">${ok ? "✅" : "⚠️"}</div>
-<h2 style="margin:0 0 8px;font-size:18px;color:#111827">${esc(title)}</h2>
-<div style="color:#6b7280;font-size:14px;line-height:1.6">${body}</div>
-</div>`, { status: ok ? 200 : 400, headers: { "Content-Type": "text/html; charset=utf-8" } });
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   const url = new URL(req.url);
@@ -88,29 +78,41 @@ Deno.serve(async (req) => {
   const appBase = (Deno.env.get("APP_BASE") || "https://ormond-hub.vercel.app").replace(/\/$/, "");
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, svcKey);
 
-  /* ---------------- GET: approve-from-email ---------------- */
+  /* ------- GET: legacy approve links from already-sent emails -------
+     *.supabase.co rewrites text/html responses to text/plain (anti-phishing),
+     so this domain can't render pages. Old emails linked here directly; hand
+     them off to the app's styled page, which calls back via approve_token. */
   if (req.method === "GET") {
-    const p = await verifyToken(url.searchParams.get("t") || "", svcKey);
-    if (!p || p.act !== "approve" || !p.id) return page("This link has expired", `Approve links expire after a while for safety. Open <a href="${appBase}" style="color:#4f46e5">Ormond Hub</a> and approve the post there.`, false);
-    const { data: it } = await supabase.from("content_items").select("id, client_id, status, caption, scheduled_at, deleted_at, clients(name)").eq("id", p.id).maybeSingle();
-    if (!it || it.deleted_at) return page("Post not found", "It may have been deleted.", false);
-    const review = `${appBase}/accounts/${it.client_id}/content?edit=${p.id}#posts`;
-    const client = (it as any).clients?.name || "";
-    if (["published", "publishing"].includes(it.status)) return page("Already published", `This ${esc(client)} post ${it.status === "publishing" ? "is publishing right now" : "has already been published"}. Nothing else to do.`);
-    if (["approved", "scheduled"].includes(it.status)) return page("Already approved", `Someone beat you to it — this ${esc(client)} post is approved and will publish ${it.scheduled_at ? esc(relWhen(it.scheduled_at)) : "shortly"}.`);
-    const overdue = it.scheduled_at && new Date(it.scheduled_at).getTime() < Date.now();
-    const { error } = await supabase.from("content_items").update({ status: "approved", approved_by: "email approval", error: null, updated_at: new Date().toISOString(), scheduled_at: overdue || !it.scheduled_at ? new Date(Date.now() + 5 * 60000).toISOString() : it.scheduled_at }).eq("id", p.id);
-    if (error) return page("Something went wrong", esc(error.message), false);
-    // Fire the publisher so an overdue approval goes out within moments, not at the next quarter-hour.
-    try { await fetch(`${fnBase}/content-publish`, { method: "POST", headers: { Authorization: `Bearer ${anon}`, "Content-Type": "application/json" }, body: "{}" }); } catch { /* cron backs it up */ }
-    const when = overdue || !it.scheduled_at ? "within the next few minutes" : `${esc(relWhen(it.scheduled_at))} (${esc(fmtWhen(it.scheduled_at))})`;
-    return page("Approved ✓", `The ${esc(client)} post is approved and will publish ${when}.<br><br><a href="${review}" style="color:#4f46e5">Open it in Ormond Hub</a>`);
+    const t = url.searchParams.get("t") || "";
+    return new Response(null, { status: 302, headers: { Location: `${appBase}/email-action?t=${encodeURIComponent(t)}` } });
   }
 
   /* ---------------- POST: cron scan ---------------- */
   const bearer = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   const envAnon = Deno.env.get("SUPABASE_ANON_KEY") || "";
   if (!bearer || (bearer !== ANON_JWT && bearer !== envAnon && bearer !== svcKey)) return J({ error: "unauthorized" }, 401);
+
+  let body: any = {};
+  try { body = await req.clone().json(); } catch {}
+
+  /* ------- approve_token: one-click approve, called by the app's /email-action page ------- */
+  if (body.action === "approve_token") {
+    const p = await verifyToken(String(body.t || ""), svcKey);
+    if (!p || p.act !== "approve" || !p.id) return J({ result: "expired" });
+    const { data: it } = await supabase.from("content_items").select("id, client_id, status, scheduled_at, deleted_at, clients(name)").eq("id", p.id).maybeSingle();
+    if (!it || it.deleted_at) return J({ result: "not_found" });
+    const client = (it as any).clients?.name || "";
+    const reviewUrl = `${appBase}/accounts/${it.client_id}/content?edit=${p.id}#posts`;
+    if (["published", "publishing"].includes(it.status)) return J({ result: "already_published", client, publishing: it.status === "publishing", reviewUrl });
+    if (["approved", "scheduled"].includes(it.status)) return J({ result: "already_approved", client, when: it.scheduled_at ? relWhen(it.scheduled_at) : null, reviewUrl });
+    const overdue = it.scheduled_at && new Date(it.scheduled_at).getTime() < Date.now();
+    const { error } = await supabase.from("content_items").update({ status: "approved", approved_by: "email approval", error: null, updated_at: new Date().toISOString(), scheduled_at: overdue || !it.scheduled_at ? new Date(Date.now() + 5 * 60000).toISOString() : it.scheduled_at }).eq("id", p.id);
+    if (error) return J({ result: "error", error: error.message });
+    // Kick the publisher so an overdue approval goes out within moments.
+    try { await fetch(`${fnBase}/content-publish`, { method: "POST", headers: { Authorization: `Bearer ${anon}`, "Content-Type": "application/json" }, body: "{}" }); } catch { /* cron backs it up */ }
+    const when = overdue || !it.scheduled_at ? "within the next few minutes" : `${relWhen(it.scheduled_at)} (${fmtWhen(it.scheduled_at)})`;
+    return J({ result: "approved", client, when, reviewUrl });
+  }
 
   const { data: rules } = await supabase.from("alert_rules").select("*").eq("enabled", true);
   if (!rules?.length) return J({ ok: true, sent: 0, note: "no enabled rules" });
@@ -166,7 +168,7 @@ Deno.serve(async (req) => {
       }
 
       const token = isUnapproved ? await signToken({ act: "approve", id: it.id, exp: nowMs + 7 * 86400_000 }, svcKey) : null;
-      const approveUrl = token ? `${fnBase}/content-alerts?t=${token}` : null;
+      const approveUrl = token ? `${appBase}/email-action?t=${encodeURIComponent(token)}` : null;
 
       const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;color:#111827;max-width:560px">
   <h2 style="margin:0 0 6px;font-size:17px">${isUnapproved ? "Post needs approval" : "Post failed to publish"} — ${esc(client)}</h2>
