@@ -57,6 +57,17 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
   const [qWhen, setQWhen] = useState("");
   const [pvCh, setPvCh] = useState(null);
   const [sureDel, setSureDel] = useState(false);
+  // Phones (matches the 640px block in globals.css): a 7-column month can't fit readable
+  // chips, so posts show as status dots and tapping a day lists its posts under the grid.
+  const [compact, setCompact] = useState(false);
+  const [pickKey, setPickKey] = useState(null);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const on = () => setCompact(mq.matches);
+    on(); setPickKey(keyOf(new Date()));
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
   useEffect(() => { setQCaption(sel?.caption || ""); setQNote(sel?.note || ""); setQWhen(sel?.scheduled_at ? toLocalInput(sel.scheduled_at) : ""); setPvCh(sel?.channels?.[0] || null); setSureDel(false); }, [sel]);
 
   // Unsaved tweaks in the modal (caption / note / scheduled time vs. what's stored)
@@ -176,12 +187,16 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
     router.refresh();
   }
 
-  function openDayMenu(key) {
-    if (dragId) return;
-    if (onCreateOnDate) { setDayMenu({ key }); return; }
-    // Agency calendar: clicking a day opens the bulk sheet for that day's posts
+  function openDaySheet(key) {
     const dayItems = byDate[key] || [];
     if (dayItems.length) { setDaySheet({ key }); setDayChecked(dayItems.filter((i) => i.status !== "published" && i.status !== "publishing").map((i) => i.id)); setMoveTo(""); }
+  }
+  function openDayMenu(key) {
+    if (dragId) return;
+    if (compact) { setPickKey(key); return; } // phones: select the day; its posts list under the grid
+    if (onCreateOnDate) { setDayMenu({ key }); return; }
+    // Agency calendar: clicking a day opens the bulk sheet for that day's posts
+    openDaySheet(key);
   }
   async function bulkDay(action) {
     if (!dayChecked.length) return;
@@ -268,7 +283,7 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
           const dayNotes = notesByDate[key] || [];
           return (
             <div key={i}
-              className={"cal-cell" + (key === todayKey ? " today" : "") + (overKey === key ? " dragover" : "") + (onCreateOnDate || dayItems.length ? " clickable-day" : "")}
+              className={"cal-cell" + (key === todayKey ? " today" : "") + (compact && key === pickKey ? " picked" : "") + (overKey === key ? " dragover" : "") + (onCreateOnDate || dayItems.length ? " clickable-day" : "")}
               onClick={() => openDayMenu(key)}
               onDragOver={(e) => { if (dragId) { e.preventDefault(); setOverKey(key); } }}
               onDragLeave={() => setOverKey((k) => (k === key ? null : k))}
@@ -295,6 +310,37 @@ export default function ContentCalendar({ items, notes = [], teamMembers = [], c
           );
         })}
       </div>
+
+      {/* ------- phones: the picked day's notes + posts ------- */}
+      {compact && (
+        <div className="cal-agenda">
+          <div className="cal-agenda-head">
+            <b>{pickKey ? fmtDay(pickKey) : "Tap a day to see its posts"}</b>
+            {pickKey && onCreateOnDate && <button className="social-btn" onClick={() => setDayMenu({ key: pickKey })}>＋ Add</button>}
+            {pickKey && !onCreateOnDate && (byDate[pickKey] || []).length > 1 && <button className="social-btn" onClick={() => openDaySheet(pickKey)}>Bulk actions</button>}
+          </div>
+          {pickKey && (notesByDate[pickKey] || []).map((n) => (
+            <button key={"n" + n.id} className="cal-agenda-row" onClick={() => setSelNote(n)}>
+              <span>📝</span>
+              <span className="cal-agenda-main">
+                {showClient && n.client && <span className="cal-agenda-top"><b>{n.client}</b></span>}
+                <span className="cal-agenda-txt">{n.title}</span>
+              </span>
+            </button>
+          ))}
+          {pickKey && (byDate[pickKey] || []).map((it) => (
+            <button key={it.id} className="cal-agenda-row" onClick={() => setSel(it)}>
+              <span className={"cal-dot " + it.status} />
+              <span className="cal-agenda-main">
+                <span className="cal-agenda-top"><span className="cal-agenda-time">{fmtTime(it.scheduled_at)}</span>{showClient && <b>{it.client}</b>}</span>
+                <span className="cal-agenda-txt">{it.caption?.slice(0, 90) || "(no caption)"}</span>
+              </span>
+              <span className={"cbadge " + it.status}>{STATUS_LABEL[it.status]}</span>
+            </button>
+          ))}
+          {pickKey && !(byDate[pickKey] || []).length && !(notesByDate[pickKey] || []).length && <div className="muted" style={{ fontSize: 12.5, padding: "6px 2px" }}>Nothing scheduled this day.</div>}
+        </div>
+      )}
 
       {/* ------- day action chooser ------- */}
       {dayMenu && !noteForm && (

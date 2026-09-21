@@ -29,11 +29,14 @@ export default function Shell({ crumb, children, wide }) {
   const [accounts, setAccounts] = useState([]);
   const [acctOpen, setAcctOpen] = useState(true);
   const [role, setRole] = useState("agency");
+  // Phones: the sidebar is an off-canvas drawer (see the 820px block in globals.css)
+  const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/nav").then((r) => r.json()).then((d) => setAccounts(d.accounts || [])).catch(() => {});
     fetch("/api/me").then((r) => r.json()).then((d) => setRole(d.role || "agency")).catch(() => {});
   }, []);
+  useEffect(() => { setNavOpen(false); }, [path]);
   const isAgency = role === "agency";
   const isManager = role === "manager";
   const isClient = role === "client";
@@ -54,8 +57,10 @@ export default function Shell({ crumb, children, wide }) {
   const acctName = accounts.find((a) => a.id === acctId)?.client || "Account";
 
   return (
-    <div className="app">
-      <aside className="sidebar">
+    <div className={"app" + (navOpen ? " nav-open" : "")}>
+      <div className="nav-backdrop" onClick={() => setNavOpen(false)} />
+      {/* Same-page #section links don't change the path, so close the drawer on any link tap */}
+      <aside className="sidebar" onClick={(e) => { if (e.target.closest("a")) setNavOpen(false); }}>
         <div className="logo">Ormond Hub</div>
 
         {inAccount ? (
@@ -138,6 +143,7 @@ export default function Shell({ crumb, children, wide }) {
       </aside>
       <main className="main">
         <div className="topbar">
+          <button className="nav-toggle" aria-label="Open menu" aria-expanded={navOpen} onClick={() => setNavOpen(true)}>☰</button>
           <div className="crumb">{crumb}</div>
           <div className="range">
             {["7", "30", "90"].map((d) => (
