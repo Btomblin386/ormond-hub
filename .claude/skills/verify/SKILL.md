@@ -28,7 +28,8 @@ postgres.js doesn't verify it).
 3. **Run**: `./node_modules/.bin/next dev -p 3100` (use the local binary — bare `npx next` grabs
    the wrong major version if node_modules is missing; `npm install` first).
 
-4. **Login**: POST `/api/login` with form field `password=<DASHBOARD_PASSWORD>` (legacy agency),
+4. **Login**: POST `/api/login` with form fields `password=<DASHBOARD_PASSWORD>` **and `agency_master=1`**
+   (legacy agency — without `agency_master` it 303s to `/login?e=1` and you silently get the public landing page),
    or `email`+`password` for a seeded `app_users` row. Hash for seeding:
    `pbkdf2Sync(pw, salt, 100000, 32, "sha256").toString("hex")` (see `lib/auth.js`).
    With curl use a cookie jar; with Playwright just drive the `/login` form.
