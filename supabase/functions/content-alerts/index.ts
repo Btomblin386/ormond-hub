@@ -3,16 +3,16 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 // Content alert engine, driven by the rules on the hub's Notifications page.
 //
-//  POST {}                → scan: for every enabled rule, find matching posts and
-//                           email the rule's recipients via send-email (the hub's
-//                           email spine). Deduped one email per (rule, post) via
-//                           alert_sends. Runs on a */5 cron; POST requires the
-//                           anon bearer (verify_jwt is off for the GET below).
-//  GET ?t=<signed token>  → one-click Approve from inside the alert email.
-//                           Token = b64url(payload).b64url(HMAC-SHA256(payload,
-//                           SERVICE_ROLE_KEY)) — only this function can mint or
-//                           verify one. Approves the post, kicks the publisher,
-//                           renders a tiny confirmation page.
+//  POST {}                        → scan: for every enabled rule, find matching posts and
+//                                   email the rule's recipients via send-email. Deduped one
+//                                   email per (rule, post) via alert_sends. */5 cron.
+//  POST {action:"peek_token"}     → verify a signed approve token and describe the post.
+//                                   READ-ONLY — this is what the /email-action page load calls.
+//  POST {action:"approve_token",  → approve the post. Only the Approve button's form POST
+//        confirm:true}              sends this; without confirm:true it degrades to a peek.
+//  GET ?t=<token>                 → legacy links in already-sent emails: 302 to the app's
+//                                   /email-action page (*.supabase.co rewrites text/html
+//                                   to text/plain, so this domain can't render pages).
 //
 // Rule kinds:
 //  unapproved_post — post scheduled within lead_minutes (or up to 48h overdue)
@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
   /* ------- GET: legacy approve links from already-sent emails -------
      *.supabase.co rewrites text/html responses to text/plain (anti-phishing),
      so this domain can't render pages. Old emails linked here directly; hand
-     them off to the app's styled page, which calls back via approve_token. */
+     them off to the app's styled page, which peeks via peek_token (read-only). */
   if (req.method === "GET") {
     const t = url.searchParams.get("t") || "";
     return new Response(null, { status: 302, headers: { Location: `${appBase}/email-action?t=${encodeURIComponent(t)}` } });
@@ -95,17 +95,36 @@ Deno.serve(async (req) => {
   let body: any = {};
   try { body = await req.clone().json(); } catch {}
 
-  /* ------- approve_token: one-click approve, called by the app's /email-action page ------- */
-  if (body.action === "approve_token") {
+  /* ------- peek_token / approve_token: the app's /email-action page -------
+     Mail security scanners (Proofpoint, Safe Links) open every link in an email
+     within seconds of delivery, so merely LOADING the page must never approve
+     anything — that once auto-approved every alerted post. The page load peeks
+     (read-only) to render the post + an Approve button; only that button's POST
+     sends approve_token with confirm:true. An approve_token without confirm is
+     treated as a peek, so a stale app build can't approve on page load either. */
+  if (body.action === "peek_token" || body.action === "approve_token") {
+    const doApprove = body.action === "approve_token" && body.confirm === true;
     const p = await verifyToken(String(body.t || ""), svcKey);
     if (!p || p.act !== "approve" || !p.id) return J({ result: "expired" });
-    const { data: it } = await supabase.from("content_items").select("id, client_id, status, scheduled_at, deleted_at, clients(name)").eq("id", p.id).maybeSingle();
+    const { data: it } = await supabase.from("content_items").select("id, client_id, channels, caption, cover_url, media_urls, status, post_type, scheduled_at, deleted_at, clients(name)").eq("id", p.id).maybeSingle();
     if (!it || it.deleted_at) return J({ result: "not_found" });
     const client = (it as any).clients?.name || "";
     const reviewUrl = `${appBase}/accounts/${it.client_id}/content?edit=${p.id}#posts`;
     if (["published", "publishing"].includes(it.status)) return J({ result: "already_published", client, publishing: it.status === "publishing", reviewUrl });
     if (["approved", "scheduled"].includes(it.status)) return J({ result: "already_approved", client, when: it.scheduled_at ? relWhen(it.scheduled_at) : null, reviewUrl });
-    const overdue = it.scheduled_at && new Date(it.scheduled_at).getTime() < Date.now();
+    const overdue = !!it.scheduled_at && new Date(it.scheduled_at).getTime() < Date.now();
+    if (!doApprove) {
+      const thumb = it.cover_url || (it.media_urls || []).find((u: string) => /\.(jpe?g|png|webp|gif)(\?|$)/i.test(u)) || null;
+      return J({
+        result: "pending", client, reviewUrl, overdue, thumb,
+        status: STATUS_LABEL[it.status] || it.status,
+        channels: (it.channels || []).map((c: string) => CHAN[c] || c).join(" + "),
+        postType: it.post_type && it.post_type !== "feed" ? it.post_type : null,
+        when: it.scheduled_at ? relWhen(it.scheduled_at) : null,
+        whenAbs: it.scheduled_at ? fmtWhen(it.scheduled_at) : null,
+        caption: (it.caption || "").slice(0, 600), captionCut: (it.caption || "").length > 600,
+      });
+    }
     const { error } = await supabase.from("content_items").update({ status: "approved", approved_by: "email approval", error: null, updated_at: new Date().toISOString(), scheduled_at: overdue || !it.scheduled_at ? new Date(Date.now() + 5 * 60000).toISOString() : it.scheduled_at }).eq("id", p.id);
     if (error) return J({ result: "error", error: error.message });
     // Kick the publisher so an overdue approval goes out within moments.
